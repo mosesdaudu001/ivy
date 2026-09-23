@@ -1,12 +1,12 @@
 Open Tasks
 ==========
 
-.. _`repo`: https://github.com/unifyai/ivy
-.. _`discord`: https://discord.gg/sXyFF8tDtm
+.. _`repo`: https://github.com/ivy-llc/ivy
+.. _`discord`: https://discord.gg/uYRmyPxMQq
 .. _`open tasks thread`: https://discord.com/channels/799879767196958751/1189903501011202128
 .. _`issue description`: https://github.com/unifyai/ivy/issues/1526
 .. _`reference API`: https://numpy.org/doc/stable/reference/routines.linalg.html
-.. _`imports`: https://github.com/unifyai/ivy/blob/38dbb607334cb32eb513630c4496ad0024f80e1c/ivy/functional/frontends/numpy/__init__.py#L27
+.. _`imports`: https://github.com/ivy-llc/ivy/blob/38dbb607334cb32eb513630c4496ad0024f80e1c/ivy/functional/frontends/numpy/__init__.py#L27
 .. _`Deep Dive`: ../deep_dive.rst
 
 Here, we explain all tasks which are currently open for contributions from the community!
@@ -62,13 +62,13 @@ Ensure that your solution addresses the issue effectively and doesn't introduce 
 Once you're confident in your fix, submit a pull request to the main repository.
 Our team will review your contribution, provide feedback if necessary, and then merge your changes once we're good to go.
 
-**Video**
+.. **Video**
 
-.. raw:: html
+.. .. raw:: html
 
-    <iframe width="420" height="315" allow="fullscreen;"
-    src="https://www.youtube.com/embed/EmN2T_O_Ggw" class="video" allowfullscreen="true">
-    </iframe>
+..     <iframe width="420" height="315" allow="fullscreen;"
+..     src="https://www.youtube.com/embed/EmN2T_O_Ggw" class="video" allowfullscreen="true">
+..     </iframe>
 
 Frontend APIs
 -------------

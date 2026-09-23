@@ -131,14 +131,6 @@ def ceil(input, *, out=None):
 @with_unsupported_dtypes({"2.2 and below": ("float16", "complex")}, "torch")
 @to_ivy_arrays_and_back
 def clamp(input, min=None, max=None, *, out=None):
-    ivy.utils.assertions.check_all_or_any_fn(
-        min,
-        max,
-        fn=ivy.exists,
-        type="any",
-        limit=[1, 2],
-        message="at most one of min or max can be None",
-    )
     if min is None:
         return ivy.minimum(input, max, out=out)
     if max is None:
@@ -195,6 +187,8 @@ def erf(input, *, out=None):
 @with_unsupported_dtypes({"2.2 and below": ("float16",)}, "torch")
 @to_ivy_arrays_and_back
 def exp(input, *, out=None):
+    if ivy.is_int_dtype(input.dtype) or ivy.is_bool_dtype(input.dtype):
+        input = ivy.astype(input, "float32")
     return ivy.exp(input, out=out)
 
 
@@ -419,6 +413,10 @@ def positive(input, *, out=None):
 @with_unsupported_dtypes({"2.2 and below": ("bool",)}, "torch")
 @to_ivy_arrays_and_back
 def pow(input, exponent, *, out=None):
+    # torch supports input not being a tensor as well
+    if not ivy.is_array(input):
+        input = torch_frontend.as_tensor(input).ivy_array
+
     if not ivy.is_array(exponent):
         if (
             any(dtype in str(input.dtype) for dtype in ["int8", "int16"])
@@ -511,7 +509,7 @@ def sin(input, *, out=None):
     return ivy.sin(input, out=out)
 
 
-@with_unsupported_dtypes({"2.2 and below": ("float16",)}, "torch")
+@with_unsupported_dtypes({"2.2 and below": ("bfloat16", "float16",)}, "torch")
 @to_ivy_arrays_and_back
 def sinc(input, *, out=None):
     return ivy.sinc(input, out=out)

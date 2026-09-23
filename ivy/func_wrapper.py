@@ -137,11 +137,12 @@ def cross_caster(intersect):
     dtype = ""
     valid_float = sorted(ivy.valid_float_dtypes)
     valid_int = sorted(ivy.valid_int_dtypes)
+    valid_bool = [ivy.bool]
     intersect = sorted(intersect)
     if set(valid_int).issubset(intersect):
         # make dtype equal to default float
         dtype = ivy.default_float_dtype()
-    elif set(valid_float).issubset(intersect):
+    elif set(valid_float).issubset(intersect) or set(valid_bool).issubset(intersect):
         # make dtype equal to default int
         dtype = ivy.default_int_dtype()
 
@@ -360,7 +361,9 @@ def handle_array_like_without_promotion(fn: Callable) -> Callable:
                     # Fix for ellipsis, slices for numpy's __getitem__
                     # No need to try and convert them into arrays
                     # since asarray throws unpredictable bugs
-                    if _check_in_nested_sequence(arg, value=Ellipsis, _type=slice):
+                    if arg is None or _check_in_nested_sequence(
+                        arg, value=Ellipsis, _type=slice
+                    ):
                         continue
                     if not ivy.is_array(arg):
                         args[i] = ivy.array(arg, device=device)
@@ -394,8 +397,6 @@ def inputs_to_native_arrays(fn: Callable) -> Callable:
         -------
             The return of the function, with native arrays passed in the arguments.
         """
-        if not ivy.array_mode:
-            return fn(*args, **kwargs)
         # check if kwargs contains an out argument, and if so, remove it
         has_out = False
         out = None
@@ -1002,31 +1003,7 @@ def temp_asarray_wrapper(fn: Callable) -> Callable:
     return _temp_asarray_wrapper
 
 
-# Download compiled cython wrapper wrapper
-
-
-def download_cython_wrapper_wrapper(fn: Callable) -> Callable:
-    @functools.wraps(fn)
-    def _download_cython_wrapper_wrapper(*args, **kwargs):
-        """Wrap the function to download compiled cython wrapper for the
-        function and re- wraps it with the downloaded wrapper.
-
-        Download the compiled cython wrapper by calling
-        ivy.wrappers.get_wrapper(func_name: str) and then wrap the
-        function with the downloaded wrapper.
-        """
-        ivy.wrappers.download_cython_wrapper(fn.__name__)
-        ivy.wrappers.load_one_wrapper(fn.__name__)
-        ivy.functional.__dict__[fn.__name__] = getattr(
-            ivy.wrappers, fn.__name__ + "_wrapper"
-        )(fn)
-        return ivy.functional.__dict__[fn.__name__](*args, **kwargs)
-
-    return _download_cython_wrapper_wrapper
-
-
 # Functions #
-
 
 def _wrap_function(
     key: str, to_wrap: Callable, original: Callable, compositional: bool = False
@@ -1069,12 +1046,6 @@ def _wrap_function(
                 )
         return to_wrap
     if isinstance(to_wrap, FunctionType):
-        if ivy.cython_wrappers_mode and ivy.wrappers.wrapper_exists(to_wrap.__name__):
-            if to_wrap.__name__ + "_wrapper" in ivy.wrappers.__all__:
-                to_wrap = getattr(ivy.wrappers, to_wrap.__name__ + "_wrapper")(to_wrap)
-                return to_wrap
-            else:
-                return download_cython_wrapper_wrapper(to_wrap)
         # set attributes
         for attr in original.__dict__.keys():
             # private attribute or decorator

@@ -1273,7 +1273,7 @@ def dft(
         The length of the signal.If greater than the axis dimension,
         the signal will be zero-padded up to dft_length. If less than
         the axis dimension, only the first dft_length values will be
-        used as the signal. It’s an optional value.
+        used as the signal. It's an optional value.
     norm
           Optional argument, "backward", "ortho" or "forward". Defaults to be
           "backward".
@@ -1476,10 +1476,6 @@ def nearest_interpolate(x, dims, size, scale, exact):
         n = size[d]
         offsets = (ivy.arange(n, dtype="float32") + off) * scale[d]
         offsets = ivy.astype(ivy.floor(ivy.astype(offsets, "float32")), "int64")
-        num_dims_to_add = x.ndim - offsets.ndim
-        if num_dims_to_add > 0:
-            for _ in range(num_dims_to_add):
-                offsets = ivy.expand_dims(offsets, axis=0)
         x = ivy.gather(x, offsets, axis=d + 2)
     return x
 
@@ -1781,7 +1777,6 @@ def interpolate(
         - trilinear
         - nd
         - nearest
-        - nearest-exact
         - area
         - tf_area
         - bicubic
@@ -2020,16 +2015,48 @@ def _output_ceil_shape(w, f, p, s):
     return math.ceil((w - f + p) / s) + 1
 
 
-def _padding_ceil_mode(w, f, p, s, return_added_padding=False):
-    remaining_pixels = (w - f + p[0]) % s
+def _padding_ceil_mode(
+    w: int,
+    f: int,
+    p: Tuple[int],
+    s: int,
+    return_added_padding: Optional[bool] = False,
+) -> Union[Tuple[int], Tuple[Tuple[int], int]]:
+    """Adjust padding to ensure the output size is computed using ceiling mode.
+
+    Parameters
+    ----------
+        w
+            The width or height (i.e., spatial dimension) of the array
+        f
+            The size of the kernel/filter
+        p
+            A tuple of two integers representing the padding before (left or top) and after (right or bottom) the input array
+        s
+            The stride
+        return_added_padding
+            If True, the function also returns the amount of padding added to the original padding
+
+    Returns
+    -------
+        p
+            The adjusted padding values as a tuple (left/top padding, right/bottom padding)
+        added_padding (optional)
+            The amount of padding added to the original right/bottom padding to ensure correct output size when `return_added_padding` is True
+    """
+    remaining_pixels = (w - f + sum(p)) % s
     added_padding = 0
+    # if the additional pixels potentially captured thanks to ceil mode
+    # are all in the padding then no padding is added
+    if remaining_pixels <= p[1] and s + p[1] - remaining_pixels >= f:
+        return (p, added_padding) if return_added_padding else p
     if s > 1 and remaining_pixels != 0 and f > 1:
         input_size = w + sum(p)
         # making sure that the remaining pixels are supposed
         # to be covered by the window
         # they won't be covered if stride is big enough to skip them
         if input_size - remaining_pixels - (f - 1) + s > input_size:
-            return p
+            return (p, added_padding) if return_added_padding else p
         output_shape = _output_ceil_shape(
             w,
             f,
@@ -2197,6 +2224,135 @@ adaptive_max_pool2d.mixed_backend_wrappers = {
 
 @handle_nestable
 @inputs_to_ivy_arrays
+def adaptive_max_pool3d(
+    input: Union[ivy.Array, ivy.NativeArray],
+    output_size: Union[Sequence[int], int],
+):
+    """Apply a 3D adaptive maximum pooling over an input signal composed of
+    several input planes.
+
+    Parameters
+    ----------
+    input
+        Input array. Must have shape (N, C, D_in, H_in, W_in) or (C, D_in, H_in, W_in)
+        where N is the batch dimension, C is the feature dimension, and D_in, H_in,
+        and W_in are the 3 spatial dimensions.
+    output_size
+        Spatial output size.
+
+    Returns
+    -------
+        The result of the pooling operation. Will have shape (N, C, D_out, H_out, W_out)
+        or (C, D_out, H_out, W_out), where D_out, H_out, W_out = `output_size`
+    """
+    squeeze = False
+    if input.ndim == 4:
+        input = ivy.expand_dims(input, axis=0)
+        squeeze = True
+    elif input.ndim != 5:
+        raise ivy.utils.exceptions.IvyException(
+            f"Got {len(input.shape)}D input, but only 4D and 5D inputs are supported."
+        )
+
+    if isinstance(output_size, int):
+        output_size = (output_size, output_size, output_size)
+
+    in_d, in_h, in_w = input.shape[-3:]
+    out_d, out_h, out_w = output_size
+
+    idxd, length_d, range_max_d, adaptive_d = _compute_idx(
+        in_d, out_d, input.device
+    )
+    idxh, length_h, range_max_h, adaptive_h = _compute_idx(
+        in_h, out_h, input.device
+    )
+    idxw, length_w, range_max_w, adaptive_w = _compute_idx(
+        in_w, out_w, input.device
+    )
+
+    all_adaptive = adaptive_d or adaptive_h or adaptive_w
+
+    if not all_adaptive:
+        max_len_d = length_d
+        max_len_h = length_h
+        max_len_w = length_w
+    else:
+        max_len_d = ivy.shape(range_max_d)[0]
+        max_len_h = ivy.shape(range_max_h)[0]
+        max_len_w = ivy.shape(range_max_w)[0]
+
+    grid = ivy.meshgrid(
+        ivy.arange(out_d),
+        ivy.arange(out_h),
+        ivy.arange(out_w),
+        ivy.arange(max_len_d),
+        ivy.arange(max_len_h),
+        ivy.arange(max_len_w),
+        indexing="ij",
+    )
+
+    d_indices = idxd[grid[0], grid[3]]
+    h_indices = idxh[grid[1], grid[4]]
+    w_indices = idxw[grid[2], grid[5]]
+
+    vals = ivy.array(
+        input.to_numpy()[..., d_indices, h_indices, w_indices], device=input.device
+    )
+
+    if all_adaptive:
+        if adaptive_d:
+            mask_d = ivy.greater_equal(
+                range_max_d, ivy.expand_dims(length_d, axis=-1)
+            )
+            mask_d_expanded = mask_d[grid[0], grid[3]]
+        else:
+            mask_d = ivy.greater_equal(range_max_d, length_d)
+            mask_d_expanded = mask_d[grid[3]]
+
+        if adaptive_h:
+            mask_h = ivy.greater_equal(
+                range_max_h, ivy.expand_dims(length_h, axis=-1)
+            )
+            mask_h_expanded = mask_h[grid[1], grid[4]]
+        else:
+            mask_h = ivy.greater_equal(range_max_h, length_h)
+            mask_h_expanded = mask_h[grid[4]]
+
+        if adaptive_w:
+            mask_w = ivy.greater_equal(
+                range_max_w, ivy.expand_dims(length_w, axis=-1)
+            )
+            mask_w_expanded = mask_w[grid[2], grid[5]]
+        else:
+            mask_w = ivy.greater_equal(range_max_w, length_w)
+            mask_w_expanded = mask_w[grid[5]]
+
+        mask = ivy.logical_or(
+            ivy.logical_or(mask_d_expanded, mask_h_expanded), mask_w_expanded
+        )
+
+        vals = ivy.where(mask, ivy.array(float("-inf"), device=vals.device), vals)
+
+    ret = ivy.max(vals, axis=(-3, -2, -1)).astype(input.dtype)
+
+    if squeeze:
+        return ivy.squeeze(ret, axis=0)
+    return ret
+
+
+adaptive_max_pool3d.mixed_backend_wrappers = {
+    "to_add": (
+        "handle_backend_invalid",
+        "inputs_to_native_arrays",
+        "outputs_to_ivy_arrays",
+        "handle_device",
+    ),
+    "to_skip": ("inputs_to_ivy_arrays",),
+}
+
+
+@handle_nestable
+@inputs_to_ivy_arrays
 def adaptive_avg_pool1d(
     input: Union[ivy.Array, ivy.NativeArray],
     output_size: int,
@@ -2325,7 +2481,7 @@ def adaptive_avg_pool2d(
         stride = tuple(i_s // o_s for i_s, o_s in zip(input.shape[-2:], output_size))
         kernel_size = stride  # Mathematically identical to the previous expression
         pooled_output = ivy.avg_pool2d(
-            input, kernel_size, stride, "VALID", data_format="NCHW"
+            input, kernel_size, stride, "VALID", data_format=data_format
         )
         pooled_output = (
             ivy.permute_dims(pooled_output, (0, *range(2, input.ndim), 1))
@@ -2336,11 +2492,16 @@ def adaptive_avg_pool2d(
             return ivy.squeeze(pooled_output, axis=0)
         return pooled_output
 
+    if not hasattr(input, "device"):
+        device = list(input.devices())[0]
+    else:
+        device = input.device
+
     idxh, length_h, range_max_h, adaptive_h = _compute_idx(
-        input.shape[-2], output_size[-2], input.device
+        input.shape[-2], output_size[-2], device
     )
     idxw, length_w, range_max_w, adaptive_w = _compute_idx(
-        input.shape[-1], output_size[-1], input.device
+        input.shape[-1], output_size[-1], device
     )
 
     # to numpy and back in order to bypass a slicing error in tensorflow
@@ -2531,7 +2692,7 @@ def sliding_window(
     stride
         The stride of the sliding window for each dimension of input
     padding
-        Either the string ‘SAME’ (padding with zeros evenly), the string ‘VALID’ (no
+        Either the string 'SAME' (padding with zeros evenly), the string 'VALID' (no
         padding), or a sequence of n (low, high) integer pairs that give the padding to
         apply before and after each spatial dimension.
     dilation
@@ -2667,7 +2828,7 @@ def reduce_window(
     window_strides
         A sequence containing the window strides.
     padding
-        Either the string ‘SAME’ (padding with zeros evenly), the string ‘VALID’ (no
+        Either the string 'SAME' (padding with zeros evenly), the string 'VALID' (no
         padding), or a sequence of n (low, high) integer pairs that give the padding to
         apply before and after each spatial dimension.
     base_dilation

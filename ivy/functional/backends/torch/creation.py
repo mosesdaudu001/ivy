@@ -81,6 +81,12 @@ def arange(
 arange.support_native_out = True
 
 
+def complex(
+    real: torch.Tensor, imag: torch.Tensor, out: Optional[torch.Tensor] = None
+) -> torch.Tensor:
+    return torch.complex(real, imag, out=out)
+
+
 def _stack_tensors(x, dtype):
     if isinstance(x, (list, tuple)) and len(x) != 0 and isinstance(x[0], (list, tuple)):
         for i, item in enumerate(x):
@@ -236,6 +242,7 @@ def from_dlpack(x, /, *, out: Optional[torch.Tensor] = None):
     return torch.from_dlpack(x)
 
 
+@with_unsupported_dtypes({"2.2.0 and below": ("bfloat16",)}, backend_version)
 def full(
     shape: Union[ivy.NativeShape, Sequence[int]],
     fill_value: Union[int, float, bool],
@@ -247,9 +254,13 @@ def full(
     dtype = ivy.default_dtype(dtype=dtype, item=fill_value, as_native=True)
     if isinstance(shape, int):
         shape = (shape,)
+
+    shape = tuple(int(dim) for dim in shape)
+    fill_value = torch.tensor(fill_value, dtype=dtype)
+
     return torch.full(
-        shape,
-        fill_value,
+        size=shape,
+        fill_value=fill_value,
         dtype=dtype,
         device=device,
         out=out,

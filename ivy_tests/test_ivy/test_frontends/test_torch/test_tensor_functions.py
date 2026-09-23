@@ -90,7 +90,6 @@ def test_torch_is_floating_point(
     backend_fw,
 ):
     input_dtype, x = dtype_and_x
-    ivy.set_backend(backend_fw)
     helpers.test_frontend_function(
         input_dtypes=input_dtype,
         backend_to_test=backend_fw,
@@ -98,9 +97,8 @@ def test_torch_is_floating_point(
         test_flags=test_flags,
         fn_tree=fn_tree,
         on_device=on_device,
-        input=ivy.asarray(x[0]),
+        input=x[0],
     )
-    ivy.previous_backend()
 
 
 @handle_frontend_test(
@@ -135,6 +133,7 @@ def test_torch_is_nonzero(
 @handle_frontend_test(
     fn_tree="torch.is_tensor",
     dtype_and_x=helpers.dtype_and_values(available_dtypes=helpers.get_dtypes("valid")),
+    number_positional_args=st.just(1),
 )
 def test_torch_is_tensor(
     *,

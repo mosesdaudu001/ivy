@@ -6,7 +6,7 @@ Array API Tests
 .. _`test_array_api`: https://github.com/unifyai/ivy/tree/20d07d7887766bb0d1707afdabe6e88df55f27a5/ivy_tests
 .. _`for each backend`: https://github.com/unifyai/ivy/tree/20d07d7887766bb0d1707afdabe6e88df55f27a5/.github/workflows
 .. _`repo`: https://github.com/unifyai/ivy
-.. _`discord`: https://discord.gg/sXyFF8tDtm
+.. _`discord`: https://discord.gg/uYRmyPxMQq
 .. _`array api tests thread`: https://discord.com/channels/799879767196958751/1189907361494741073
 .. _`scripts/shell/test_array_api.sh`: https://github.com/unifyai/ivy/blob/bcddc79978afe447958dfa3ea660716845c85846/scripts/shell/test_array_api.sh
 .. _`array-api test repository`: https://github.com/data-apis/array-api/tree/main
@@ -15,7 +15,6 @@ Array API Tests
 .. _`git website`: https://www.git-scm.com/book/en/v2/Git-Tools-Submodules
 .. _`hypothesis`: https://hypothesis.readthedocs.io/en/latest/
 .. _`ivy tests`: ivy_tests.rst
-.. _`CI Pipeline`: continuous_integration.html
 
 In conjunction with our own ivy unit tests, we import the array-api `test suite`_.
 These tests check that all ivy backend libraries behave according to the `Array API Standard`_ which was established in May 2020 by a group of maintainers.
@@ -206,10 +205,10 @@ This should have hopefully given you a good understanding of how the Array API t
 
 If you have any questions, please feel free to reach out on `discord`_ in the `array api tests thread`_!
 
-**Video**
+.. **Video**
 
-.. raw:: html
+.. .. raw:: html
 
-    <iframe width="420" height="315" allow="fullscreen;"
-    src="https://www.youtube.com/embed/R1XuYwzhxWw" class="video">
-    </iframe>
+..     <iframe width="420" height="315" allow="fullscreen;"
+..     src="https://www.youtube.com/embed/R1XuYwzhxWw" class="video">
+..     </iframe>

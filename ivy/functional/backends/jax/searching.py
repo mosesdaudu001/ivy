@@ -34,7 +34,7 @@ def argmax(
         ret = jnp.argmax(x, axis=axis, keepdims=keepdims)
     if dtype:
         dtype = ivy.as_native_dtype(dtype)
-        return ret.astype(dtype)
+        return jnp.astype(ret, dtype)
     return ret
 
 
@@ -60,7 +60,7 @@ def argmin(
         ret = jnp.argmin(x, axis=axis, keepdims=keepdims)
     if dtype:
         dtype = ivy.as_native_dtype(dtype)
-        return ret.astype(dtype)
+        return jnp.astype(ret, dtype)
     return ret
 
 
@@ -72,7 +72,10 @@ def nonzero(
     size: Optional[int] = None,
     fill_value: Number = 0,
 ) -> Union[JaxArray, Tuple[JaxArray]]:
-    res = jnp.nonzero(x, size=size, fill_value=fill_value)
+    if x.ndim == 0:
+        res = jnp.atleast_1d(x).nonzero(size=size, fill_value=fill_value)
+    else:
+        res = jnp.nonzero(x, size=size, fill_value=fill_value)
 
     if as_tuple:
         return tuple(res)

@@ -1,8 +1,8 @@
 The Basics
 ==========
 
-.. _`repo`: https://github.com/unifyai/ivy
-.. _`discord`: https://discord.gg/sXyFF8tDtm
+.. _`repo`: https://github.com/ivy-llc/ivy
+.. _`discord`: https://discord.gg/uYRmyPxMQq
 .. _`todo list issues thread`: https://discord.com/channels/799879767196958751/1189903501011202128
 .. _`Atlassian tutorial`: https://www.atlassian.com/git/tutorials/saving-changes/git-stash
 .. _`fork management thread`: https://discord.com/channels/799879767196958751/1189903708465672272
@@ -15,14 +15,14 @@ Getting Help
 
 There are a few different communication channels that you can make use of in order to ask for help:
 
-#. `Discord server <https://discord.gg/sXyFF8tDtm>`_
+#. `Discord server <https://discord.gg/uYRmyPxMQq>`_
 #. `Issues <https://github.com/unifyai/ivy/issues>`_
 
 We'll quickly outline how each of these should be used, and also which question is most appropriate for which context.
 
 **Discord Server**
 
-The `discord server <https://discord.gg/sXyFF8tDtm>`_ is most suitable for very quick and simple questions.
+The `discord server <https://discord.gg/uYRmyPxMQq>`_ is most suitable for very quick and simple questions.
 These questions should **always** be asked in the correct channel.
 There is a tendency to use the *general* landing channel for everything.
 This isn't the end of the world, but if many unrelated messages come flying into the *general* channel, then it does make it very hard to keep track of the different discussions, and it makes it less likely that you will receive a response.
@@ -34,13 +34,13 @@ For example, if you are applying for an internship, then you should make use of 
 As the name suggests, the `issues <https://github.com/unifyai/ivy/issues>`_ section on GitHub is the best place to raise issues or general bugs that you find with the project.
 It can also serve as a useful place to ask questions, but only if you suspect that the behaviour you are observing *might* be a bug.
 
-**Video**
+.. **Video**
 
-.. raw:: html
+.. .. raw:: html
 
-    <iframe width="420" height="315" allow="fullscreen;"
-    src="https://www.youtube.com/embed/T5vQP1pCXS8" class="video" allowfullscreen="true">
-    </iframe>
+..     <iframe width="420" height="315" allow="fullscreen;"
+..     src="https://www.youtube.com/embed/T5vQP1pCXS8" class="video" allowfullscreen="true">
+..     </iframe>
 
 |
 
@@ -102,13 +102,13 @@ This is to prevent anyone from self-allocating many sub-tasks, preventing others
 Even though the limit is three, sub-tasks should only be self-assigned using **one comment per sub-task**.
 For example, a sequence of comments like this :code:`- [ ] #Issue_number` will register correctly whereas a single comment like this :code:`- [ ] #Issue_number, - [ ] #Issue_number, - [ ] #Issue_number` or this :code:`- [ ] #Issue_number #Issue_number #Issue_number` etc. will not.
 
-**Video**
+.. **Video**
 
-.. raw:: html
+.. .. raw:: html
 
-    <iframe width="420" height="315" allow="fullscreen;"
-    src="https://www.youtube.com/embed/wBKTOGmwfbo" class="video" allowfullscreen="true">
-    </iframe>
+..     <iframe width="420" height="315" allow="fullscreen;"
+..     src="https://www.youtube.com/embed/wBKTOGmwfbo" class="video" allowfullscreen="true">
+..     </iframe>
 
 |
 
@@ -143,13 +143,13 @@ The corresponding commands are :code:`git stash` -> :code:`git fetch` -> :code:`
 Note that this only works for uncommitted changes (staged and unstaged) and untracked files won't be stashed.
 For a comprehensive explanation of git stashing, check out this `Atlassian tutorial`_.
 
-**Video**
+.. **Video**
 
-.. raw:: html
+.. .. raw:: html
 
-    <iframe width="420" height="315" allow="fullscreen;"
-    src="https://www.youtube.com/embed/TFMPihytg9U" class="video" allowfullscreen="true">
-    </iframe>
+..     <iframe width="420" height="315" allow="fullscreen;"
+..     src="https://www.youtube.com/embed/TFMPihytg9U" class="video" allowfullscreen="true">
+..     </iframe>
 
 |
 
@@ -238,13 +238,13 @@ This will enable us to quickly fix conflicts, merge with upstream, and get thing
 
 The code review process is explained in more detail in the following video.
 
-**Video**
+.. **Video**
 
-.. raw:: html
+.. .. raw:: html
 
-    <iframe width="420" height="315" allow="fullscreen;"
-    src="https://www.youtube.com/embed/9G4d-CvlT2g" class="video" allowfullscreen="true">
-    </iframe>
+..     <iframe width="420" height="315" allow="fullscreen;"
+..     src="https://www.youtube.com/embed/9G4d-CvlT2g" class="video" allowfullscreen="true">
+..     </iframe>
 
 |
 

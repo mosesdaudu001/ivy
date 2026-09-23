@@ -9,25 +9,31 @@ from collections import namedtuple
 
 @to_ivy_arrays_and_back
 @with_supported_dtypes(
-    {"2.2 and below": ("float32", "float64", "complex32", "complex64")}, "torch"
+    {"2.2 and below": ("float32", "float64", "complex32", "complex64", "complex128")},
+    "torch",
 )
 def cholesky(input, *, upper=False, out=None):
     return ivy.cholesky(input, upper=upper, out=out)
 
 
 @to_ivy_arrays_and_back
+@with_supported_dtypes(
+    {"2.2 and below": ("float32", "float64", "complex32", "complex64")}, "torch"
+)
 def cholesky_ex(input, *, upper=False, check_errors=False, out=None):
     try:
+        results = namedtuple("cholesky_ex", ["L", "info"])
         matrix = ivy.cholesky(input, upper=upper, out=out)
         info = ivy.zeros(input.shape[:-2], dtype=ivy.int32)
-        return matrix, info
+        return results(matrix, info)
     except RuntimeError as e:
         if check_errors:
             raise RuntimeError(e) from e
         else:
+            results = namedtuple("cholesky_ex", ["L", "info"])
             matrix = input * math.nan
             info = ivy.ones(input.shape[:-2], dtype=ivy.int32)
-            return matrix, info
+            return results(matrix, info)
 
 
 @to_ivy_arrays_and_back
@@ -73,7 +79,12 @@ def eig(input, *, out=None):
     "torch",
 )
 def eigh(A, UPLO="L", *, out=None):
-    return ivy.eigh(A, UPLO=UPLO, out=out)
+    result_tuple = namedtuple("eigh", ["eigenvalues", "eigenvectors"])
+    eigenvalues, eigenvectors = ivy.eigh(A, UPLO=UPLO, out=out)
+    return result_tuple(
+        ivy.astype(eigenvalues, ivy.float64),
+        ivy.astype(eigenvectors, A.dtype),
+    )
 
 
 @to_ivy_arrays_and_back
@@ -89,15 +100,19 @@ def eigvals(input, *, out=None):
 
 @to_ivy_arrays_and_back
 @with_supported_dtypes(
-    {"2.2 and below": ("float32", "float64", "complex32", "complex64")}, "torch"
+    {
+        "2.2 and below": (
+            "float32",
+            "float64",
+            "complex32",
+            "complex64",
+            "complex128",
+        )
+    }, "torch"
 )
 def eigvalsh(input, UPLO="L", *, out=None):
     ret = ivy.eigvalsh(input, UPLO=UPLO, out=out)
-    if "complex64" in ivy.as_ivy_dtype(ret.dtype):
-        ret = ivy.astype(ret, ivy.float32)
-    elif "complex128" in ivy.as_ivy_dtype(ret.dtype):
-        ret = ivy.astype(ret, ivy.float64)
-    return ret
+    return ivy.astype(ret, ivy.float64)
 
 
 @to_ivy_arrays_and_back
@@ -132,7 +147,45 @@ def inv_ex(A, *, check_errors=False, out=None):
     {"2.2 and below": ("float32", "float64", "complex32", "complex64")}, "torch"
 )
 def lu_factor(A, *, pivot=True, out=None):
-    return ivy.lu_factor(A, pivot=pivot, out=out)
+    LU, pivots = ivy.lu_factor(A, pivot=pivot, out=out)
+    lu_factor_tuple = namedtuple("linalg_lu_factor", ["LU", "pivots"])
+    return lu_factor_tuple(
+        LU=LU,
+        pivots=pivots,
+    )
+
+
+@to_ivy_arrays_and_back
+@with_supported_dtypes(
+    {"2.2 and below": ("float32", "float64", "complex32", "complex64")}, "torch"
+)
+def lu_factor_ex(A, *, pivot=True, check_errors=False, out=None):
+    try:
+        # Perform LU factorization and get the result as a named tuple
+        LU, pivots = ivy.lu_factor(A, pivot=pivot, out=out)
+        info = ivy.zeros(A.shape[:-2], dtype=ivy.int32)
+    except RuntimeError as e:
+        if check_errors:
+            raise RuntimeError(e) from e
+        else:
+            # If there's an error and check_errors is False, handle the error
+            LU = ivy.full_like(A, math.nan)
+            pivots = ivy.full_like(A.shape[:-1], math.nan)
+            info = ivy.ones(A.shape[:-2], dtype=ivy.int32)
+
+    # Create a named tuple for the final result
+    lu_factor_ex_tuple = namedtuple("linalg_lu_factor_ex", ["LU", "pivots", "info"])
+
+    # Return the results
+    return lu_factor_ex_tuple(LU=LU, pivots=pivots, info=info)
+
+
+@to_ivy_arrays_and_back
+@with_supported_dtypes(
+    {"2.2 and below": ("float32", "float64")}, "torch"
+)
+def lu_solve(LU, pivots, B, *, left=True, adjoint=False, out=None):
+    return ivy.lu_solve(LU, pivots, B, out=out)
 
 
 @to_ivy_arrays_and_back
@@ -154,11 +207,9 @@ def matrix_exp(A):
     {"2.2 and below": ("float32", "float64", "complex32", "complex64")}, "torch"
 )
 def matrix_norm(input, ord="fro", dim=(-2, -1), keepdim=False, *, dtype=None, out=None):
-    if "complex" in ivy.as_ivy_dtype(input.dtype):
-        input = ivy.abs(input)
-    if dtype:
-        input = ivy.astype(input, ivy.as_ivy_dtype(dtype))
-    return ivy.matrix_norm(input, ord=ord, axis=dim, keepdims=keepdim, out=out)
+    return ivy.matrix_norm(
+        input, ord=ord, axis=dim, keepdims=keepdim, dtype=dtype, out=out
+    )
 
 
 @to_ivy_arrays_and_back
@@ -173,8 +224,8 @@ def matrix_power(A, n, *, out=None):
 @with_supported_dtypes(
     {"2.2 and below": ("float32", "float64", "complex32", "complex64")}, "torch"
 )
-def matrix_rank(A, *, atol=None, rtol=None, hermitian=False, out=None):
-    return ivy.matrix_rank(A, atol=atol, rtol=rtol, hermitian=hermitian, out=out)
+def matrix_rank(input, *, atol=None, rtol=None, hermitian=False, out=None):
+    return ivy.matrix_rank(input, atol=atol, rtol=rtol, hermitian=hermitian, out=out)
 
 
 @to_ivy_arrays_and_back
@@ -198,10 +249,20 @@ def norm(input, ord=None, dim=None, keepdim=False, *, dtype=None, out=None):
     elif dim is None and ord is None:
         input = ivy.flatten(input)
         ret = ivy.vector_norm(input, axis=0, keepdims=keepdim, ord=2)
-    if isinstance(dim, int):
+    elif dim != None and ord is None:
+        ret = ivy.vector_norm(input, axis=dim, keepdims=keepdim, ord=2)
+    elif isinstance(dim, int):
         ret = ivy.vector_norm(input, axis=dim, keepdims=keepdim, ord=ord)
-    elif isinstance(dim, tuple):
+    elif isinstance(dim, tuple) and len(dim) <= 2:
         ret = ivy.matrix_norm(input, axis=dim, keepdims=keepdim, ord=ord)
+    elif isinstance(dim, tuple) and len(dim) > 2:
+        raise RuntimeError(
+            f"linalg.norm: If dim is specified, it must be of length 1 or 2. Got {dim}"
+        )
+    if dtype == "complex64":
+        ret = ivy.astype(ret, "float32")
+    elif dtype == "complex128":
+        ret = ivy.astype(ret, "float64")
     return ret
 
 
@@ -362,7 +423,7 @@ def vander(x, N=None):
         raise RuntimeError("Input dim must be greater than or equal to 1.")
 
     # pytorch always return int64 for integers
-    if "int" in x.dtype:
+    if "int" in str(x.dtype):
         x = ivy.astype(x, ivy.int64)
 
     if len(x.shape) == 1:
@@ -405,3 +466,6 @@ def vector_norm(input, ord=2, dim=None, keepdim=False, *, dtype=None, out=None):
     return ivy.vector_norm(
         input, axis=dim, keepdims=keepdim, ord=ord, out=out, dtype=dtype
     )
+
+
+lu = lu_factor

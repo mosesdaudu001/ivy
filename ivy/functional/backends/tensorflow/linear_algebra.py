@@ -130,8 +130,7 @@ def eigh(
         eigenvalues, eigenvectors = tf.linalg.eigh(x)
 
     elif UPLO == "U":
-        axes = list(range(len(x.shape) - 2)) + [len(x.shape) - 1, len(x.shape) - 2]
-        eigenvalues, eigenvectors = tf.linalg.eigh(tf.transpose(x, perm=axes))
+        eigenvalues, eigenvectors = tf.linalg.eigh(tf.linalg.adjoint(x))
     return result_tuple(eigenvalues, eigenvectors)
 
 
@@ -233,17 +232,6 @@ def matmul(
         x1 = tf.cast(x1, dtype_from)
         x2 = tf.cast(x2, dtype_from)
 
-    if (
-        x1.shape == ()
-        or x2.shape == ()
-        or (len(x1.shape) == len(x2.shape) == 1 and x1.shape != x2.shape)
-        or (len(x1.shape) == len(x2.shape) == 1 and x1.shape != x2.shape)
-        or (len(x1.shape) == 1 and len(x2.shape) >= 2 and x1.shape[0] != x2.shape[-2])
-        or (len(x2.shape) == 1 and len(x1.shape) >= 2 and x2.shape[0] != x1.shape[-1])
-        or (len(x1.shape) >= 2 and len(x2.shape) >= 2 and x1.shape[-1] != x2.shape[-2])
-    ):
-        raise ivy.utils.exceptions.IvyException("Error,shapes not compatible")
-
     x1_padded = False
     x1_padded_2 = False
     x2_padded = False
@@ -288,8 +276,11 @@ def matrix_norm(
     ord: Union[int, float, Literal[inf, -inf, "fro", "nuc"]] = "fro",
     axis: Tuple[int, int] = (-2, -1),
     keepdims: bool = False,
+    dtype: Optional[tf.DType] = None,
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Union[tf.Tensor, tf.Variable]:
+    if dtype is not None:
+        x = ivy.astype(x, dtype).to_native()
     if ord == "nuc":
         x = tf.experimental.numpy.moveaxis(x, axis, (-2, -1))
         ret = tf.reduce_sum(
@@ -626,6 +617,7 @@ def vecdot(
             "float16",
             "bfloat16",
             "integer",
+            "complex64",
         )
     },
     backend_version,

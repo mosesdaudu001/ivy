@@ -28,8 +28,7 @@ def histogram(
     density: Optional[bool] = False,
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Tuple[tf.Tensor]:
-    # TODO: Implement in pure tensorflow
-    pass
+    raise ivy.exceptions.IvyNotImplementedException("histogram is not yet implemented in ivy's tensorflow backend")
 
 
 @with_supported_dtypes(
@@ -49,8 +48,7 @@ def median(
     keepdims: bool = False,
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Union[tf.Tensor, tf.Variable]:
-    pass
-    # TODO: Implement in pure tensorflow
+    raise ivy.exceptions.IvyNotImplementedException("median is not yet implemented in ivy's tensorflow backend")
 
 
 @with_supported_dtypes(
@@ -239,8 +237,7 @@ def quantile(
     keepdims: bool = False,
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Union[tf.Tensor, tf.Variable]:
-    pass
-    # TODO: Implement in pure tensorflow
+    raise ivy.exceptions.IvyNotImplementedException("quantile is not yet implemented in ivy's tensorflow backend")
 
 
 def corrcoef(
@@ -278,8 +275,7 @@ def nanmedian(
     overwrite_input: bool = False,
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Union[tf.Tensor, tf.Variable]:
-    pass
-    # TODO: Implement in pure tensorflow
+    raise ivy.exceptions.IvyNotImplementedException("nanmedian is not yet implemented in ivy's tensorflow backend")
 
 
 @with_supported_device_and_dtypes(
@@ -310,7 +306,7 @@ def bincount(
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Union[tf.Tensor, tf.Variable]:
     return tf.math.bincount(
-        x.numpy().tolist(),
+        x,
         weights=weights,
         minlength=minlength,
         dtype=x.dtype if weights is None else weights.dtype,
@@ -564,7 +560,7 @@ def __get_index(lst, indices=None, prefix=None):
 
 
 @with_unsupported_dtypes(
-    {"2.15.0 and below": ("bfloat16", "complex")},
+    {"2.15.0 and below": ("bfloat16", "bool", "complex")},
     backend_version,
 )
 def cummin(

@@ -273,6 +273,16 @@ def pad(
         )
 
 
+def pad_sequence(
+    sequences: Union[np.ndarray, Iterable[Tuple[int]]],
+    batch_first: bool = False,
+    padding_value: Union[Iterable[Tuple[Number]], Number] = 0,
+):
+    raise ivy.exceptions.IvyNotImplementedException(
+        "pad_sequence not implemented for Numpy backend"
+    )
+
+
 def vsplit(
     ary: np.ndarray,
     indices_or_sections: Union[int, Sequence[int], np.ndarray],
@@ -594,7 +604,9 @@ def put_along_axis(
     mode: Literal["sum", "min", "max", "mul", "replace"] = "replace",
     out: Optional[np.ndarray] = None,
 ):
-    ret = np.put_along_axis(arr.copy(), indices, values, axis)
+    ret = arr.copy()
+    values = np.asarray(values)
+    np.put_along_axis(ret, indices, values, axis)
     return ivy.inplace_update(out, ret) if ivy.exists(out) else ret
 
 

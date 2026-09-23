@@ -17,6 +17,7 @@ def assert_all_close(
     rtol=1e-05,
     atol=1e-08,
     ground_truth_backend="TensorFlow",
+    test_dtypes=True,
 ):
     """Match the ret_np and ret_from_gt_np inputs element-by-element to ensure
     that they are the same.
@@ -33,11 +34,15 @@ def assert_all_close(
         Absolute Tolerance Value.
     ground_truth_backend
         Ground Truth Backend Framework.
+    test_dtypes
+        whether to check the dtypes of the return values match.
 
     Returns
     -------
     None if the test passes, else marks the test as failed.
     """
+    if not test_dtypes:
+        ret_np, ret_from_gt_np = ivy.promote_types_of_inputs(ret_np, ret_from_gt_np)
     ret_dtype = str(ret_np.dtype)
     ret_from_gt_dtype = str(ret_from_gt_np.dtype).replace("longlong", "int64")
     assert ret_dtype == ret_from_gt_dtype, (
@@ -107,6 +112,7 @@ def value_test(
     specific_tolerance_dict=None,
     backend: str,
     ground_truth_backend="TensorFlow",
+    test_dtypes=True,
 ):
     """Perform a value test for matching the arrays in ret_np_flat and
     ret_from_np_gt_flat.
@@ -127,12 +133,14 @@ def value_test(
         (Optional) Dictionary of specific rtol and atol values according to the dtype.
     ground_truth_backend
         Ground Truth Backend Framework.
+    test_dtypes
+        whether to check the dtypes of the return values match.
 
     Returns
     -------
     None if the value test passes, else marks the test as failed.
     """
-    assert_same_type_and_shape([ret_np_flat, ret_np_from_gt_flat])
+    if test_dtypes: assert_same_type_and_shape([ret_np_flat, ret_np_from_gt_flat])
 
     if type(ret_np_flat) != list:  # noqa: E721
         ret_np_flat = [ret_np_flat]
@@ -159,6 +167,7 @@ def value_test(
                 rtol=rtol,
                 atol=atol,
                 ground_truth_backend=ground_truth_backend,
+                test_dtypes=test_dtypes,
             )
     elif rtol is not None:
         for ret_np, ret_np_from_gt in zip(ret_np_flat, ret_np_from_gt_flat):
@@ -169,6 +178,7 @@ def value_test(
                 rtol=rtol,
                 atol=atol,
                 ground_truth_backend=ground_truth_backend,
+                test_dtypes=test_dtypes,
             )
     else:
         for ret_np, ret_np_from_gt in zip(ret_np_flat, ret_np_from_gt_flat):
@@ -180,6 +190,7 @@ def value_test(
                 rtol=rtol,
                 atol=atol,
                 ground_truth_backend=ground_truth_backend,
+                test_dtypes=test_dtypes,
             )
 
 
@@ -211,6 +222,7 @@ def check_unsupported_dtype(*, fn, input_dtypes, all_as_kwargs_np):
                 break
         if (
             "dtype" in all_as_kwargs_np
+            and all_as_kwargs_np["dtype"] is not None
             and all_as_kwargs_np["dtype"] in unsupported_dtypes_fn
         ):
             test_unsupported = True
@@ -221,6 +233,7 @@ def check_unsupported_dtype(*, fn, input_dtypes, all_as_kwargs_np):
                 break
         if (
             "dtype" in all_as_kwargs_np
+            and all_as_kwargs_np["dtype"] is not None
             and all_as_kwargs_np["dtype"] not in supported_dtypes_fn
         ):
             test_unsupported = True

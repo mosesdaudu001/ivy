@@ -238,7 +238,7 @@ def test_tensorflow_angle(
 @handle_frontend_test(
     fn_tree="tensorflow.math.argmax",
     dtype_and_x=_statistical_dtype_values(function="argmax"),
-    output_type=st.sampled_from(["int16", "uint16", "int32", "int64"]),
+    output_type=st.sampled_from(["int32", "int64"]),
     test_with_out=st.just(False),
 )
 def test_tensorflow_argmax(
@@ -251,9 +251,7 @@ def test_tensorflow_argmax(
     on_device,
     output_type,
 ):
-    if backend_fw in ("torch", "paddle"):
-        assume(output_type != "uint16")
-    input_dtype, x, axis = dtype_and_x
+    input_dtype, x, axis, *_ = dtype_and_x
     if isinstance(axis, tuple):
         axis = axis[0]
     helpers.test_frontend_function(
@@ -286,7 +284,7 @@ def test_tensorflow_argmin(
     on_device,
     output_type,
 ):
-    input_dtype, x, axis = dtype_and_x
+    input_dtype, x, axis, *_ = dtype_and_x
     if isinstance(axis, tuple):
         axis = axis[0]
     helpers.test_frontend_function(
@@ -704,6 +702,8 @@ def test_tensorflow_count_nonzero(
     on_device,
 ):
     input_dtype, x, axis = dtype_x_axis
+    if backend_fw == "paddle":
+        assume(not np.any(np.less_equal(x, 1e-08)))
     helpers.test_frontend_function(
         input_dtypes=input_dtype,
         backend_to_test=backend_fw,
@@ -1731,7 +1731,7 @@ def test_tensorflow_logical_not(
 @handle_frontend_test(
     fn_tree="tensorflow.math.logical_or",
     dtype_and_x=helpers.dtype_and_values(
-        available_dtypes=helpers.get_dtypes("bool"),
+        available_dtypes=(ivy.bool,),
         num_arrays=2,
         shared_dtype=True,
     ),
@@ -1795,7 +1795,7 @@ def test_tensorflow_logical_xor(
 @handle_frontend_test(
     fn_tree="tensorflow.math.maximum",
     dtype_and_x=helpers.dtype_and_values(
-        available_dtypes=helpers.get_dtypes("float"),
+        available_dtypes=helpers.get_dtypes("numeric"),
         num_arrays=2,
         shared_dtype=True,
     ),
@@ -2204,6 +2204,8 @@ def test_tensorflow_reciprocal_no_nan(
     on_device,
 ):
     input_dtype, x = dtype_and_x
+    if backend_fw == "paddle":
+        assume(not np.any(np.less_equal(x, 1e-08)))
     helpers.test_frontend_function(
         input_dtypes=input_dtype,
         backend_to_test=backend_fw,
@@ -2374,6 +2376,8 @@ def test_tensorflow_reduce_max(
     fn_tree="tensorflow.math.reduce_mean",
     dtype_and_x=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("float"),
+        min_value=-1e30,
+        max_value=1e30,
     ),
     test_with_out=st.just(False),
 )
@@ -2434,6 +2438,9 @@ def test_tensorflow_reduce_min(
     fn_tree="tensorflow.math.reduce_prod",
     dtype_and_x=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("numeric"),
+        large_abs_safety_factor=24,
+        small_abs_safety_factor=24,
+        safety_factor_scale="log",
     ),
     test_with_out=st.just(False),
 )

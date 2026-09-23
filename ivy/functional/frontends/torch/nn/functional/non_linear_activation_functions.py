@@ -2,6 +2,7 @@
 import ivy
 from ivy.func_wrapper import with_unsupported_dtypes, with_supported_dtypes
 from ivy.functional.frontends.torch.func_wrapper import to_ivy_arrays_and_back
+import ivy.functional.frontends.torch as torch_frontend
 
 
 @to_ivy_arrays_and_back
@@ -15,7 +16,10 @@ from ivy.functional.frontends.torch.func_wrapper import to_ivy_arrays_and_back
     "torch",
 )
 def celu(input, alpha=1.0, inplace=False):
-    return ivy.celu(input, alpha=alpha)
+    ret = ivy.celu(input, alpha=alpha)
+    if inplace:
+        return ivy.inplace_update(input, ret)
+    return ret
 
 
 def celu_(input, alpha=1.0):
@@ -64,22 +68,20 @@ def glu(input, dim=-1):
 
 @to_ivy_arrays_and_back
 @with_unsupported_dtypes({"2.2 and below": ("float16",)}, "torch")
-def gumbel_softmax(logits, tau=1, hard=False, eps=1e-10, dim=-1):
-    gumbels = -ivy.empty_like(logits).exponential().log()
-    gumbels = (logits + gumbels) / tau
-    y_soft = ivy.softmax(gumbels, axis=dim)
-
+def gumbel_softmax(logits, tau=1., hard=False, eps=1e-10, dim=-1):
+    if logits.ndim == 0:
+        return ivy.ones_like(logits)
+    gumbel_noise = -ivy.log(
+        -ivy.log(ivy.random_uniform(low=0, high=1, shape=logits.shape) + eps) + eps
+    )
+    y = (logits + gumbel_noise) / tau
+    y_soft = ivy.softmax(y, axis=dim)
     if hard:
-        indices = y_soft.max(axis=dim, keepdims=True)[1]
-        y_hard = ivy.zeros_like(logits)
-        updates = ivy.ones_like(indices)
-        y_hard = ivy.scatter_nd(indices, updates, reduction="replace", out=y_hard)
-
-        ret = y_hard - y_soft.stop_gradient(preserve_type=True) + y_soft
-    else:
-        ret = y_soft
-
-    return ret
+        index = ivy.argmax(y_soft, axis=dim)
+        y_hard = ivy.one_hot(index, logits.shape[dim], axis=dim).astype(y_soft.dtype)
+        ret = y_hard - ivy.stop_gradient(y_soft) + y_soft
+        return ret.astype(logits.dtype)
+    return y_soft.astype(logits.dtype)
 
 
 @to_ivy_arrays_and_back
@@ -179,6 +181,22 @@ def normalize(input, p=2.0, dim=1, eps=1e-12, out=None):
 
 @to_ivy_arrays_and_back
 def prelu(input, weight):
+    input_dim = input.ndim
+    weight_dim = weight.ndim
+    
+    if weight_dim == 0:  
+        pass
+    elif weight_dim == 1:
+        if input_dim >= 2:
+            assert weight.shape[0] == input.shape[1], "Weight size must match input channels"
+            
+            # Unsqueeze weight to match input shape
+            weight = weight.expand_dims(axis=0).expand_dims(axis=2).expand_dims(axis=3)
+            # Add more unsqueeze operations if input has more dimensions
+            for i in range(4, input_dim):
+                weight = weight.expand_dims(axis=-1)
+    else:
+        raise ValueError("Weight must be a scalar or 1-D tensor")
     return ivy.add(ivy.maximum(0, input), ivy.multiply(weight, ivy.minimum(0, input)))
 
 
@@ -260,7 +278,7 @@ def softmax(input, dim=None, _stacklevel=3, dtype=None):
 
 @to_ivy_arrays_and_back
 @with_unsupported_dtypes({"2.2 and below": ("float16",)}, "torch")
-def softmin(input, dim=None, dtype=None):
+def softmin(input, dim=None, _stacklevel=3, dtype=None):
     if dtype:
         input = ivy.astype(ivy.array(input), ivy.as_ivy_dtype(dtype))
     return ivy.softmax(-input, axis=dim)
@@ -284,7 +302,7 @@ def softplus(input, beta=1, threshold=20):
 def softshrink(input, lambd=0.5):
     low = ivy.where(ivy.less(input, -lambd), ivy.add(input, lambd), 0)
     up = ivy.where(ivy.greater(input, lambd), ivy.subtract(input, lambd), 0)
-    return ivy.add(low, up)
+    return ivy.add(low, up).astype(input.dtype)
 
 
 @to_ivy_arrays_and_back
@@ -307,9 +325,12 @@ def tanhshrink(input):
 @to_ivy_arrays_and_back
 @with_unsupported_dtypes({"2.2 and below": ("float16",)}, "torch")
 def threshold(input, threshold, value, inplace=False):
-    return ivy.where(ivy.greater(input, threshold), input, value)
+    ret = ivy.where(ivy.greater(input, threshold), input, value).astype(input.dtype)
+    if inplace:
+        return ivy.inplace_update(input, ret)
+    return ret
 
 
 @with_unsupported_dtypes({"2.2 and below": ("float16",)}, "torch")
 def threshold_(input, threshold, value):
-    return threshold(input, threshold, value, inplace=True)
+    return torch_frontend.nn.functional.threshold(input, threshold, value, inplace=True)

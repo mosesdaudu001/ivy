@@ -52,6 +52,15 @@ def arange(
             stop = float(start)
         else:
             stop = start
+
+    # convert builtin types to tf scalars, as is expected by tf.range
+    if isinstance(start, (float, int)):
+        start = tf.convert_to_tensor(start)
+    if isinstance(stop, (float, int)):
+        stop = tf.convert_to_tensor(stop)
+    if isinstance(step, (float, int)):
+        step = tf.convert_to_tensor(step)
+
     if dtype is None:
         if isinstance(start, int) and isinstance(stop, int) and isinstance(step, int):
             return tf.cast(tf.range(start, stop, delta=step, dtype=tf.int64), tf.int32)
@@ -63,6 +72,12 @@ def arange(
             return tf.cast(tf.range(start, stop, delta=step, dtype=tf.int64), dtype)
         else:
             return tf.range(start, stop, delta=step, dtype=dtype)
+
+
+def complex(
+    real: tf.Tensor, imag: tf.Tensor, out: Optional[tf.Tensor] = None
+) -> tf.Tensor:
+    return tf.complex(real, imag)
 
 
 @_asarray_to_native_arrays_and_back
@@ -102,7 +117,11 @@ def asarray(
             ret = tf.convert_to_tensor(obj_np, dtype)
         else:
             ret = tf.convert_to_tensor(obj, dtype)
-        return tf.identity(ret) if (copy or ret.device != device) else ret
+        return (
+            tf.identity(ret)
+            if (copy or ivy.as_native_dev(ivy.dev(ret)) != device)
+            else ret
+        )
 
 
 def empty(

@@ -39,6 +39,7 @@ def cross_entropy(
     pred: Union[ivy.Array, ivy.NativeArray],
     /,
     *,
+    weight: Optional[Union[ivy.Array, ivy.NativeArray]] = None,
     axis: int = -1,
     epsilon: float = 1e-7,
     reduction: str = "mean",
@@ -49,15 +50,22 @@ def cross_entropy(
     Parameters
     ----------
     true
-        input array containing true labels.
+        input array containing true labels. Can be class indices of shape (N,) or 
+        one-hot encoded labels of shape (N, C) where N is batch size and C is number of classes.
     pred
-        input array containing the predicted labels.
+        input array containing the logits of shape (N, C).
+    weight
+        a manual rescaling weight given to each class. If given, has to be a array of size C.
     axis
-        the axis along which to compute the cross-entropy. If axis is ``-1``,
-        the cross-entropy will be computed along the last dimension. Default: ``-1``.
+        the axis along which to compute the cross-entropy. Default: ``-1``.
     epsilon
         a float in [0.0, 1.0] specifying the amount of smoothing when calculating
         the loss. If epsilon is ``0``, no smoothing will be applied. Default: ``1e-7``.
+    reduction
+        ``'none'``: No reduction will be applied to the output.
+        ``'mean'``: The output will be averaged.
+        ``'sum'``: The output will be summed.
+        Default: ``'mean'``.
     out
         optional output array, for writing the result to. It must have a shape
         that the inputs broadcast to.
@@ -72,16 +80,61 @@ def cross_entropy(
     >>> x = ivy.array([0, 0, 1, 0])
     >>> y = ivy.array([0.25, 0.25, 0.25, 0.25])
     >>> print(ivy.cross_entropy(x, y))
-    ivy.array(0.34657359)
+    ivy.array(1.3862944)
 
     >>> z = ivy.array([0.1, 0.1, 0.7, 0.1])
     >>> print(ivy.cross_entropy(x, z))
-    ivy.array(0.08916873)
+    ivy.array(0.9732134)
     """
     ivy.utils.assertions.check_elem_in_list(reduction, ["none", "sum", "mean"])
-    pred = ivy.clip(pred, epsilon, 1 - epsilon)
-    log_pred = ivy.log(pred)
-    return _reduce_loss(reduction, log_pred * true, axis, out)
+
+    if ivy.is_int_dtype(true) and len(true.shape) == len(pred.shape) - 1:
+        num_classes = pred.shape[axis]
+        true_one_hot = ivy.one_hot(true, num_classes, axis=axis)
+    elif ivy.is_int_dtype(true) and len(true.shape) == len(pred.shape):
+        if ivy.max(true) == 1 and ivy.min(true) == 0:
+            true_one_hot = ivy.astype(true, pred.dtype)
+        else:
+            num_classes = pred.shape[axis]
+            true_one_hot = ivy.one_hot(true, num_classes, axis=axis)
+    else:
+        true_one_hot = ivy.astype(true, pred.dtype)
+
+    if epsilon > 0:
+        num_classes = pred.shape[axis]
+        true_one_hot = (1 - epsilon) * true_one_hot + epsilon / num_classes
+
+    log_pred = ivy.log_softmax(pred, axis=axis)
+
+    loss = -ivy.sum(true_one_hot * log_pred, axis=axis)
+
+    if weight is not None:
+        weight = ivy.asarray(weight, dtype=pred.dtype)
+        if ivy.is_int_dtype(true) and len(true.shape) == len(pred.shape) - 1:
+            sample_weights = ivy.gather(weight, true, axis=0)
+            loss = loss * sample_weights
+        else:
+            if len(weight.shape) == 1:
+                weight_shape = [1] * len(pred.shape)
+                weight_shape[axis] = weight.shape[0]
+                weight = ivy.reshape(weight, weight_shape)
+            weighted_log_pred = log_pred * weight
+            loss = -ivy.sum(true_one_hot * weighted_log_pred, axis=axis)
+
+    if reduction == "sum":
+        return ivy.sum(loss, out=out)
+    elif reduction == "mean":
+        if weight is not None and ivy.is_int_dtype(true) and len(true.shape) == len(pred.shape) - 1:
+            sample_weights = ivy.gather(weight, true, axis=0)
+            total_weight = ivy.sum(sample_weights)
+            if out is not None:
+                return ivy.inplace_update(out, ivy.sum(loss) / ivy.clip(total_weight, 1e-8))
+            return ivy.sum(loss) / ivy.clip(total_weight, 1e-8)
+        else:
+            return ivy.mean(loss, out=out)
+    else:
+        if out is not None: return ivy.inplace_update(out, loss)
+        return loss
 
 
 @handle_exceptions
@@ -94,6 +147,7 @@ def binary_cross_entropy(
     pred: Union[ivy.Array, ivy.NativeArray],
     /,
     *,
+    weight: Optional[Union[ivy.Array, ivy.NativeArray]] = None,
     from_logits: bool = False,
     epsilon: float = 0.0,
     reduction: str = "mean",
@@ -109,8 +163,10 @@ def binary_cross_entropy(
         input array containing true labels.
     pred
         input array containing Predicted labels.
+    weight
+        a manual rescaling weight if provided it's repeated to match input array shape.
     from_logits
-        Whether `pred` is expected to be a logits tensor. By
+        whether `pred` is expected to be a logits tensor. By
         default, we assume that `pred` encodes a probability distribution.
     epsilon
         a float in [0.0, 1.0] specifying the amount of smoothing when calculating the
@@ -123,7 +179,7 @@ def binary_cross_entropy(
         a weight for positive examples. Must be an array with length equal to the number
         of classes.
     axis
-        Axis along which to compute crossentropy.
+        axis along which to compute crossentropy.
     out
         optional output array, for writing the result to. It must have a shape
         that the inputs broadcast to.
@@ -131,7 +187,7 @@ def binary_cross_entropy(
     Returns
     -------
     ret
-        The binary cross entropy between the given distributions.
+        the binary cross entropy between the given distributions.
 
 
     Examples
@@ -266,6 +322,7 @@ def binary_cross_entropy(
             1 - pred + epsilon_
         )
 
+    if weight is not None: loss *= weight
     return _reduce_loss(reduction, loss, axis, out)
 
 
@@ -289,7 +346,7 @@ def sparse_cross_entropy(
     Parameters
     ----------
     true
-     input array containing the true labels as logits.
+     input array containing the true labels as class indices.
     pred
      input array containing the predicted labels as logits.
     axis
@@ -298,6 +355,11 @@ def sparse_cross_entropy(
     epsilon
      a float in [0.0, 1.0] specifying the amount of smoothing when calculating the
      loss. If epsilon is ``0``, no smoothing will be applied. Default: ``1e-7``.
+    reduction
+     ``'none'``: No reduction will be applied to the output.
+     ``'mean'``: The output will be averaged.
+     ``'sum'``: The output will be summed.
+     Default: ``'mean'``.
     out
      optional output array, for writing the result to. It must have a shape
      that the inputs broadcast to.
@@ -311,27 +373,17 @@ def sparse_cross_entropy(
     --------
     With :class:`ivy.Array` input:
 
-    >> x = ivy.array([2])
-    >> y = ivy.array([0.1, 0.1, 0.7, 0.1])
-    >> print(ivy.sparse_cross_entropy(x, y))
-    ivy.array([0.08916873])
-
-    >>> x = ivy.array([3])
+    >>> x = ivy.array([2])
     >>> y = ivy.array([0.1, 0.1, 0.7, 0.1])
-    >>> print(ivy.cross_entropy(x, y))
-    ivy.array(5.44832274)
-
-    >>> x = ivy.array([2,3])
-    >>> y = ivy.array([0.1, 0.1])
-    >>> print(ivy.cross_entropy(x, y))
-    ivy.array(5.75646281)
+    >>> print(ivy.sparse_cross_entropy(x, y))
+    ivy.array(0.9732134)
 
     With :class:`ivy.NativeArray` input:
 
     >>> x = ivy.native_array([4])
     >>> y = ivy.native_array([0.1, 0.2, 0.1, 0.1, 0.5])
     >>> print(ivy.sparse_cross_entropy(x, y))
-    ivy.array([0.13862944])
+    ivy.array(1.32223)
 
     With :class:`ivy.Container` input:
 
@@ -339,23 +391,23 @@ def sparse_cross_entropy(
     >>> y = ivy.Container(a=ivy.array([0.1, 0.2, 0.1, 0.1, 0.5]))
     >>> print(ivy.sparse_cross_entropy(x, y))
     {
-        a: ivy.array([0.13862944])
+        a: ivy.array(1.32223)
     }
 
     With a mix of :class:`ivy.Array` and :class:`ivy.NativeArray` inputs:
 
     >>> x = ivy.array([0])
     >>> y = ivy.native_array([0.1, 0.2, 0.6, 0.1])
-    >>> print(ivy.sparse_cross_entropy(x,y))
-    ivy.array([0.57564628])
+    >>> print(ivy.sparse_cross_entropy(x, y))
+    ivy.array(1.5589634)
 
     With a mix of :class:`ivy.Array` and :class:`ivy.Container` inputs:
 
     >>> x = ivy.array([0])
     >>> y = ivy.Container(a=ivy.array([0.1, 0.2, 0.6, 0.1]))
-    >>> print(ivy.sparse_cross_entropy(x,y))
+    >>> print(ivy.sparse_cross_entropy(x, y))
     {
-        a: ivy.array([0.57564628])
+        a: ivy.array(1.5589634)
     }
 
     Instance Method Examples
@@ -365,7 +417,7 @@ def sparse_cross_entropy(
     >>> x = ivy.array([2])
     >>> y = ivy.array([0.1, 0.1, 0.7, 0.1])
     >>> print(x.sparse_cross_entropy(y))
-    ivy.array([0.08916873])
+    ivy.array(0.9732134)
 
     With :class:`ivy.Container` input:
 
@@ -373,7 +425,7 @@ def sparse_cross_entropy(
     >>> y = ivy.Container(a=ivy.array([0.1, 0.1, 0.7, 0.1]))
     >>> print(x.sparse_cross_entropy(y))
     {
-        a: ivy.array([0.08916873])
+        a: ivy.array(0.9732134)
     }
     """
     ivy.utils.assertions.check_elem_in_list(reduction, ["none", "sum", "mean"])
@@ -381,3 +433,119 @@ def sparse_cross_entropy(
     return ivy.cross_entropy(
         true, pred, axis=axis, epsilon=epsilon, reduction=reduction, out=out
     )
+
+
+@handle_exceptions
+@handle_nestable
+@handle_array_like_without_promotion
+@inputs_to_ivy_arrays
+@handle_array_function
+def ssim_loss(
+    true: Union[ivy.Array, ivy.NativeArray],
+    pred: Union[ivy.Array, ivy.NativeArray],
+    out: Optional[ivy.Array] = None,
+) -> ivy.Array:
+    """Calculate the Structural Similarity Index (SSIM) loss between two
+    images.
+
+    Parameters
+    ----------
+        true: A 4D image array of shape (batch_size, channels, height, width).
+        pred: A 4D image array of shape (batch_size, channels, height, width).
+
+    Returns
+    -------
+        ivy.Array: The SSIM loss measure similarity between the two images.
+
+    Examples
+    --------
+    With :class:`ivy.Array` input:
+    >>> import ivy
+    >>> x = ivy.ones((5, 3, 28, 28))
+    >>> y = ivy.zeros((5, 3, 28, 28))
+    >>> ivy.ssim_loss(x, y)
+    ivy.array(0.99989986)
+    """
+    # Constants for stability
+    C1 = 0.01**2
+    C2 = 0.03**2
+
+    # Calculate the mean of the two images
+    mu_x = ivy.avg_pool2d(pred, (3, 3), (1, 1), "SAME")
+    mu_y = ivy.avg_pool2d(true, (3, 3), (1, 1), "SAME")
+
+    # Calculate variance and covariance
+    sigma_x2 = ivy.avg_pool2d(pred * pred, (3, 3), (1, 1), "SAME") - mu_x * mu_x
+    sigma_y2 = ivy.avg_pool2d(true * true, (3, 3), (1, 1), "SAME") - mu_y * mu_y
+    sigma_xy = ivy.avg_pool2d(pred * true, (3, 3), (1, 1), "SAME") - mu_x * mu_y
+
+    # Calculate SSIM
+    ssim = ((2 * mu_x * mu_y + C1) * (2 * sigma_xy + C2)) / (
+        (mu_x**2 + mu_y**2 + C1) * (sigma_x2 + sigma_y2 + C2)
+    )
+
+    # Convert SSIM to loss
+    ssim_loss_value = 1 - ssim
+
+    # Return mean SSIM loss
+    ret = ivy.mean(ssim_loss_value)
+
+    if ivy.exists(out):
+        ret = ivy.inplace_update(out, ret)
+    return ret
+
+
+@handle_exceptions
+@handle_nestable
+@handle_array_like_without_promotion
+@inputs_to_ivy_arrays
+@handle_array_function
+def wasserstein_loss_discriminator(
+    p_real: Union[ivy.Array, ivy.NativeArray],
+    p_fake: Union[ivy.Array, ivy.NativeArray],
+    out: Optional[ivy.Array] = None,
+) -> ivy.Array:
+    """Compute the Wasserstein loss for the discriminator (critic).
+
+    Parameters
+    ----------
+        p_real (`ivy.Array`): Predictions for real data.
+        p_fake (`ivy.Array`): Predictions for fake data.
+
+    Returns
+    -------
+        `ivy.Array`: Wasserstein loss for the discriminator.
+    """
+    r_loss = ivy.mean(p_real)
+    f_loss = ivy.mean(p_fake)
+    ret = f_loss - r_loss
+
+    if ivy.exists(out):
+        ret = ivy.inplace_update(out, ret)
+    return ret
+
+
+@handle_exceptions
+@handle_nestable
+@handle_array_like_without_promotion
+@inputs_to_ivy_arrays
+@handle_array_function
+def wasserstein_loss_generator(
+    pred_fake: Union[ivy.Array, ivy.NativeArray],
+    out: Optional[ivy.Array] = None,
+) -> ivy.Array:
+    """Compute the Wasserstein loss for the generator.
+
+    Parameters
+    ----------
+        pred_fake (ivy.Array): Predictions for fake data.
+
+    Returns
+    -------
+        ivy.Array: Wasserstein loss for the generator.
+    """
+    ret = -1 * ivy.mean(pred_fake)
+
+    if ivy.exists(out):
+        ret = ivy.inplace_update(out, ret)
+    return ret

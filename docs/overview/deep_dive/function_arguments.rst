@@ -3,8 +3,8 @@ Function Arguments
 
 .. _`Array API Standard`: https://data-apis.org/array-api/latest/
 .. _`spec/API_specification/signatures`: https://github.com/data-apis/array-api/tree/main/spec/2022.12/API_specification
-.. _`repo`: https://github.com/unifyai/ivy
-.. _`discord`: https://discord.gg/sXyFF8tDtm
+.. _`repo`: https://github.com/ivy-llc/ivy
+.. _`discord`: https://discord.gg/uYRmyPxMQq
 .. _`function arguments thread`: https://discord.com/channels/799879767196958751/1190247823275470978
 .. _`Array API Standard convention`: https://data-apis.org/array-api/2021.12/API_specification/array_object.html#api-specification-array-object--page-root
 
@@ -213,10 +213,10 @@ These examples should hopefully give you a good understanding of what is require
 If you have any questions, please feel free to reach out on `discord`_ in the `function arguments thread`_!
 
 
-**Video**
+.. **Video**
 
-.. raw:: html
+.. .. raw:: html
 
-    <iframe width="420" height="315" allow="fullscreen;"
-    src="https://www.youtube.com/embed/5cAbryXza18" class="video">
-    </iframe>
+..     <iframe width="420" height="315" allow="fullscreen;"
+..     src="https://www.youtube.com/embed/5cAbryXza18" class="video">
+..     </iframe>

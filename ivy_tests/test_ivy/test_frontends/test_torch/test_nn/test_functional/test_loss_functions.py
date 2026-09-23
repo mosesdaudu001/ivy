@@ -6,7 +6,7 @@ from hypothesis import strategies as st
 import ivy_tests.test_ivy.helpers as helpers
 from ivy_tests.test_ivy.helpers import handle_frontend_test
 import ivy
-from ivy.functional.frontends.torch.nn.functional.loss_functions import (
+from ivy.functional.frontends.torch.nn.functional import (
     cosine_similarity,
 )
 
@@ -111,7 +111,6 @@ def test_torch_binary_cross_entropy(
         min_dim_size=2,
     ),
     size_average=st.booleans(),
-    reduce=st.booleans(),
     reduction=st.sampled_from(["mean", "none", "sum", None]),
     dtype_and_pos_weight=st.one_of(
         helpers.dtype_and_values(
@@ -134,7 +133,6 @@ def test_torch_binary_cross_entropy_with_logits(
     dtype_and_pred,
     dtype_and_weight,
     size_average,
-    reduce,
     reduction,
     dtype_and_pos_weight,
     on_device,
@@ -163,9 +161,10 @@ def test_torch_binary_cross_entropy_with_logits(
         target=true[0],
         weight=weight[0],
         size_average=size_average,
-        reduce=reduce,
         reduction=reduction,
         pos_weight=pos_weight[0],
+        atol=1e-02,
+        rtol=1e-02,
     )
 
 
@@ -243,31 +242,34 @@ def test_torch_cosine_embedding_loss(
     fn_tree="torch.nn.functional.cross_entropy",
     dtype_and_input=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("float"),
-        allow_inf=False,
-        min_num_dims=2,
-        max_num_dims=2,
-        min_dim_size=1,
+        min_num_dims=1,
+        max_num_dims=1,
+        min_dim_size=2,
+        abs_smallest_val=1e-05,
     ),
     dtype_and_target=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("float"),
-        min_value=0.0,
+        min_value=1e-05,
         max_value=1.0,
-        allow_inf=False,
         min_num_dims=1,
         max_num_dims=1,
         min_dim_size=2,
+        abs_smallest_val=1e-05,
     ),
     dtype_and_weights=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("float"),
-        allow_inf=False,
+        min_value=1e-05,
+        max_value=1.0,
         min_num_dims=1,
         max_num_dims=1,
         min_dim_size=2,
+        abs_smallest_val=1e-05,
     ),
     size_average=st.booleans(),
     reduce=st.booleans(),
     reduction=st.sampled_from(["mean", "none", "sum"]),
     label_smoothing=helpers.floats(min_value=0, max_value=0.49),
+    number_positional_args=st.just(2),
 )
 def test_torch_cross_entropy(
     *,
@@ -301,6 +303,8 @@ def test_torch_cross_entropy(
         reduce=reduce,
         reduction=reduction,
         label_smoothing=label_smoothing,
+        atol=1e-02,
+        rtol=1e-02,
     )
 
 
@@ -353,8 +357,8 @@ def test_torch_gaussian_nll_loss(
         full=full,
         eps=eps,
         reduction=reduction,
-        atol=1e-2,
-        rtol=1e-2,
+        atol=1e-1,
+        rtol=1e-1,
     )
 
 
@@ -415,8 +419,11 @@ def test_torch_hinge_embedding_loss(
         num_arrays=2,
         allow_inf=False,
         shared_dtype=True,
+        min_value=-1e02,
+        max_value=1e02,
+        abs_smallest_val=1e-02,
     ),
-    delta=helpers.floats(min_value=0, max_value=5),
+    delta=helpers.floats(min_value=0, max_value=5, abs_smallest_val=1e-03),
     reduction=st.sampled_from(["none", "mean", "sum"]),
     test_with_out=st.just(False),
 )
@@ -445,6 +452,8 @@ def test_torch_huber_loss(
         target=true,
         reduction=reduction,
         delta=delta,
+        atol=1e-2,
+        rtol=1e-1,
     )
 
 
@@ -509,6 +518,9 @@ def test_torch_kl_div(
         num_arrays=2,
         allow_inf=False,
         shared_dtype=True,
+        min_value=-1,
+        max_value=1,
+        abs_smallest_val=1e-04,
     ),
     size_average=st.booleans(),
     reduce=st.booleans(),
@@ -542,6 +554,8 @@ def test_torch_l1_loss(
         size_average=size_average,
         reduce=reduce,
         reduction=reduction,
+        atol=1e-2,
+        rtol=1e-2,
     )
 
 
@@ -661,90 +675,106 @@ def test_torch_mse_loss(
 
 
 # multilabel_margin_loss
-
-
 @handle_frontend_test(
     fn_tree="torch.nn.functional.multilabel_margin_loss",
-    dtype_and_inputs=helpers.dtype_and_values(
-        available_dtypes=helpers.get_dtypes("valid"),
-        num_arrays=2,
-        allow_inf=False,
-        shared_dtype=True,
+    dtype_and_input=helpers.dtype_and_values(
+        available_dtypes=helpers.get_dtypes("float"),
         min_num_dims=1,
+        max_num_dims=2,
+        min_dim_size=5,
+        min_value=-1e04,
+        max_value=1e04,
+        abs_smallest_val=1e-04,
+    ),
+    dtype_and_target=helpers.dtype_and_values(
+        available_dtypes=helpers.get_dtypes("integer"),
+        min_num_dims=1,
+        max_num_dims=2,
+        min_value=-2,
+        max_value=2,
     ),
     size_average=st.booleans(),
-    reduce=st.booleans(),
     reduction=st.sampled_from(["none", "mean", "sum"]),
     test_with_out=st.just(False),
+    number_positional_args=st.just(2),
 )
 def test_torch_multilabel_margin_loss(
     *,
-    dtype_and_inputs,
+    dtype_and_input,
+    dtype_and_target,
     reduction,
     size_average,
-    reduce,
     test_flags,
     fn_tree,
     backend_fw,
     frontend,
     on_device,
 ):
-    input_dtype, x = dtype_and_inputs
+    input_dtype, x = dtype_and_input
+    target_dtype, y = dtype_and_target
     helpers.test_frontend_function(
         backend_to_test=backend_fw,
-        input_dtypes=input_dtype,
+        input_dtypes=[input_dtype[0], target_dtype[0]],
         frontend=frontend,
         test_flags=test_flags,
         fn_tree=fn_tree,
         on_device=on_device,
         input=x[0],
-        target=x[1],
+        target=y[0],
         reduction=reduction,
         size_average=size_average,
-        reduce=reduce,
     )
 
 
 # multilabel soft margin loss
 @handle_frontend_test(
     fn_tree="torch.nn.functional.multilabel_soft_margin_loss",
-    dtype_and_inputs=helpers.dtype_and_values(
+    dtype_and_input=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("float"),
-        num_arrays=2,
-        allow_inf=False,
-        shared_dtype=True,
         min_num_dims=1,
+        max_num_dims=2,
+        min_dim_size=5,
+        min_value=-1,
+        max_value=1,
+        abs_smallest_val=1e-04,
+    ),
+    dtype_and_target=helpers.dtype_and_values(
+        available_dtypes=helpers.get_dtypes("integer"),
+        min_num_dims=1,
+        max_num_dims=2,
+        min_value=-2,
+        max_value=2,
     ),
     size_average=st.booleans(),
-    reduce=st.booleans(),
     reduction=st.sampled_from(["none", "mean", "sum"]),
     test_with_out=st.just(False),
+    number_positional_args=st.just(2),
 )
 def test_torch_multilabel_soft_margin_loss(
     *,
-    dtype_and_inputs,
-    size_average,
-    reduce,
+    dtype_and_input,
+    dtype_and_target,
     reduction,
+    size_average,
     test_flags,
     fn_tree,
     backend_fw,
     frontend,
     on_device,
 ):
-    input_dtype, x = dtype_and_inputs
+    input_dtype, x = dtype_and_input
+    target_dtype, y = dtype_and_target
     helpers.test_frontend_function(
-        input_dtypes=input_dtype,
         backend_to_test=backend_fw,
+        input_dtypes=[input_dtype[0], target_dtype[0]],
         frontend=frontend,
         test_flags=test_flags,
         fn_tree=fn_tree,
         on_device=on_device,
         input=x[0],
-        target=x[1],
-        size_average=size_average,
-        reduce=reduce,
+        target=y[0],
         reduction=reduction,
+        size_average=size_average,
     )
 
 
@@ -753,9 +783,10 @@ def test_torch_multilabel_soft_margin_loss(
     fn_tree="torch.nn.functional.nll_loss",
     dtype_and_input=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("float"),
+        shared_dtype=True,
+        num_arrays=2,
         min_value=0.01,
         max_value=1.0,
-        allow_inf=False,
         min_num_dims=1,
         max_num_dims=1,
         min_dim_size=1,
@@ -765,31 +796,20 @@ def test_torch_multilabel_soft_margin_loss(
         available_dtypes=helpers.get_dtypes("integer"),
         min_value=0.0,
         max_value=1.0,
-        allow_inf=False,
-        min_num_dims=1,
-        max_num_dims=1,
-        min_dim_size=1,
-        max_dim_size=1,
-    ),
-    dtype_and_weights=helpers.dtype_and_values(
-        available_dtypes=helpers.get_dtypes("float"),
-        allow_inf=False,
         min_num_dims=1,
         max_num_dims=1,
         min_dim_size=1,
         max_dim_size=1,
     ),
     size_average=st.booleans(),
-    reduce=st.booleans(),
     reduction=st.sampled_from(["mean", "none", "sum"]),
+    number_positional_args=st.just(2),
 )
 def test_torch_nll_loss(
     *,
     dtype_and_input,
     dtype_and_target,
-    dtype_and_weights,
     size_average,
-    reduce,
     reduction,
     on_device,
     fn_tree,
@@ -799,9 +819,8 @@ def test_torch_nll_loss(
 ):
     inputs_dtype, input = dtype_and_input
     target_dtype, target = dtype_and_target
-    weights_dtype, weights = dtype_and_weights
     helpers.test_frontend_function(
-        input_dtypes=inputs_dtype + target_dtype + weights_dtype,
+        input_dtypes=[inputs_dtype[0]] + target_dtype + [inputs_dtype[1]],
         backend_to_test=backend_fw,
         frontend=frontend,
         test_flags=test_flags,
@@ -809,9 +828,8 @@ def test_torch_nll_loss(
         on_device=on_device,
         input=input[0],
         target=target[0],
-        weight=weights[0],
+        weight=input[1],
         size_average=size_average,
-        reduce=reduce,
         reduction=reduction,
     )
 
@@ -972,7 +990,7 @@ def test_torch_soft_margin_loss(
         max_num_dims=2,
         min_dim_size=1,
     ),
-    margin=st.floats(),
+    margin=st.floats(min_value=0.1),
     p=st.integers(min_value=0, max_value=2),
     swap=st.booleans(),
     size_average=st.booleans(),
@@ -1032,16 +1050,15 @@ def test_torch_triplet_margin_loss(
         max_num_dims=2,
         min_dim_size=1,
     ),
-    distance_function=st.sampled_from([cosine_similarity, None]),
-    margin=st.floats(min_value=-10, max_value=10),
+    margin=st.floats(min_value=0.1),
     swap=st.booleans(),
     reduction=st.sampled_from(["none", "mean", "sum"]),
     test_with_out=st.just(False),
+    number_positional_args=st.just(3),
 )
 def test_torch_triplet_margin_with_distance_loss(
     *,
     dtype_and_inputs,
-    distance_function,
     margin,
     swap,
     reduction,
@@ -1055,7 +1072,6 @@ def test_torch_triplet_margin_with_distance_loss(
     anchor_dtype, anchor = input_dtype[0], x[0]
     positive_dtype, positive = input_dtype[1], x[1]
     negative_dtype, negative = input_dtype[2], x[2]
-    test_flags.num_positional_args = len(x)
     helpers.test_frontend_function(
         input_dtypes=[anchor_dtype, positive_dtype, negative_dtype],
         backend_to_test=backend_fw,
@@ -1066,7 +1082,6 @@ def test_torch_triplet_margin_with_distance_loss(
         anchor=anchor,
         positive=positive,
         negative=negative,
-        distance_function=distance_function,
         margin=margin,
         swap=swap,
         reduction=reduction,

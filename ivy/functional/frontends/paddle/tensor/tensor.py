@@ -248,6 +248,13 @@ class Tensor:
         return int(self._ivy_array)
 
     @with_unsupported_dtypes(
+        {"2.6.1 and below": ("bool", "unsigned", "int8", "float16", "bfloat16")},
+        "paddle",
+    )
+    def __div__(self, y, name=None):
+        return paddle_frontend.divide(self, y, name=name)
+
+    @with_unsupported_dtypes(
         {
             "2.6.0 and below": (
                 "bool",
@@ -263,6 +270,10 @@ class Tensor:
     )
     def __long__(self):
         return int(self._ivy_array)
+
+    @with_supported_dtypes({"2.6.0 and below": ("int32", "int64")}, "paddle")
+    def __mod__(self, y, /, name=None):
+        return paddle_frontend.Tensor(ivy.fmod(self._ivy_array, _to_ivy_array(y)))
 
     # Instance Methods #
     # ---------------- #

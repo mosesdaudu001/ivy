@@ -62,6 +62,20 @@ def concat(
     return ret
 
 
+@with_supported_dtypes(
+    {
+        "2.6.0 and below": (
+            "int32",
+            "int64",
+            "float64",
+            "complex128",
+            "float32",
+            "complex64",
+            "bool",
+        )
+    },
+    backend_version,
+)
 def expand_dims(
     x: paddle.Tensor,
     /,
@@ -95,7 +109,8 @@ def flip(
 
 
 @with_unsupported_dtypes(
-    {"2.6.0 and below": ("uint8", "int8", "int16", "bfloat16")}, backend_version
+    {"2.6.0 and below": ("uint8", "int8", "int16", "bfloat16", "float16")},
+    backend_version,
 )
 def permute_dims(
     x: paddle.Tensor,
@@ -105,6 +120,9 @@ def permute_dims(
     copy: Optional[bool] = None,
     out: Optional[paddle.Tensor] = None,
 ) -> paddle.Tensor:
+    if copy:
+        newarr = paddle.clone(x)
+        return paddle.transpose(newarr, axes)
     return paddle.transpose(x, axes)
 
 
@@ -411,6 +429,7 @@ def constant_pad(
     return paddle.nn.functional.pad(x=x, pad=paddings, value=value)
 
 
+@with_unsupported_dtypes({"2.6.0 and below": ("float16",)}, backend_version)
 def zero_pad(
     x: paddle.Tensor,
     /,
@@ -437,6 +456,16 @@ def zero_pad(
     },
     backend_version,
 )
+def pad_sequence(
+    sequences: Union[paddle.Tensor, Iterable[Tuple[int]]],
+    batch_first: bool = False,
+    padding_value: Union[Iterable[Tuple[Number]], Number] = 0,
+):
+    raise ivy.exceptions.IvyNotImplementedException(
+        "pad_sequence not implemented for Paddle backend"
+    )
+
+
 def swapaxes(
     x: paddle.Tensor,
     axis0: int,
@@ -451,6 +480,10 @@ def swapaxes(
     return paddle_backend.permute_dims(x, axes)
 
 
+@with_supported_dtypes(
+    {"2.6.0 and below": ("int32", "int64", "float32", "float64")},
+    backend_version,
+)
 def clip(
     x: paddle.Tensor,
     /,

@@ -2,7 +2,7 @@ Exception Handling
 ==================
 
 .. _`exception handling thread`: https://discord.com/channels/799879767196958751/1189908450570928149
-.. _`discord`: https://discord.gg/sXyFF8tDtm
+.. _`discord`: https://discord.gg/uYRmyPxMQq
 
 As Ivy is unifying multiple backends, various issues are seen during exception handling:
 
@@ -547,10 +547,10 @@ This should have hopefully given you a good feel for how function wrapping is ap
 
 If you have any questions, please feel free to reach out on `discord`_ in the `exception handling thread`_!
 
-**Video**
+.. **Video**
 
-.. raw:: html
+.. .. raw:: html
 
-    <iframe width="420" height="315" allow="fullscreen;"
-    src="https://www.youtube.com/embed/eTc24eG9P_s" class="video">
-    </iframe>
+..     <iframe width="420" height="315" allow="fullscreen;"
+..     src="https://www.youtube.com/embed/eTc24eG9P_s" class="video">
+..     </iframe>

@@ -68,6 +68,15 @@ class Finfo:
     def smallest_normal(self):
         return float(self._paddle_finfo.tiny)
 
+    def __getattribute__(self, name):
+        try:
+            # Try to get the attribute from the Finfo class
+            return super().__getattribute__(name)
+        except AttributeError:
+            # If the attribute doesn't exist in Finfo, try to get it from _paddle_finfo
+            paddle_finfo = super().__getattribute__("_paddle_finfo")
+            return getattr(paddle_finfo, name)
+
 
 class Iinfo:
     def __init__(self, paddle_iinfo: np.iinfo):
@@ -118,6 +127,10 @@ def astype(
     out: Optional[paddle.Tensor] = None,
 ) -> paddle.Tensor:
     dtype = ivy.as_native_dtype(dtype)
+
+    if copy and 0 in x.shape:
+        return paddle.empty(x.shape, dtype=dtype)
+
     if x.dtype == dtype:
         return x.clone() if copy else x
     return x.clone().cast(dtype) if copy else x.cast(dtype)

@@ -1,7 +1,8 @@
 # global
 import math
 from numbers import Number
-from typing import Union, Tuple, Optional, List, Sequence, Iterable
+from typing import Iterable, List, Optional, Sequence, Tuple, Union
+
 import jax.numpy as jnp
 import numpy as np
 
@@ -9,6 +10,7 @@ import numpy as np
 import ivy
 from ivy.func_wrapper import with_unsupported_dtypes
 from ivy.functional.backends.jax import JaxArray
+
 from . import backend_version
 
 
@@ -76,6 +78,9 @@ def permute_dims(
     copy: Optional[bool] = None,
     out: Optional[JaxArray] = None,
 ) -> JaxArray:
+    if copy:
+        newarr = jnp.copy(x)
+        return jnp.transpose(newarr, axes)
     return jnp.transpose(x, axes)
 
 
@@ -122,6 +127,8 @@ def squeeze(
     copy: Optional[bool] = None,
     out: Optional[JaxArray] = None,
 ) -> JaxArray:
+    if copy:
+        x = jnp.copy(x)
     if x.shape == ():
         if axis is None or axis == 0 or axis == -1:
             return x
@@ -215,14 +222,18 @@ def clip(
         if not hasattr(x_min, "dtype"):
             x_min = ivy.array(x_min).data
         promoted_type = ivy.as_native_dtype(ivy.promote_types(x.dtype, x_min.dtype))
-        x = jnp.where(x < x_min, x_min.astype(promoted_type), x.astype(promoted_type))
+        x = jnp.where(
+            x < x_min, jnp.astype(x_min, promoted_type), jnp.astype(x, promoted_type)
+        )
     if x_max is not None:
         if not hasattr(x_max, "dtype"):
             x_max = ivy.array(x_max).data
         promoted_type = ivy.as_native_dtype(
             ivy.promote_types(promoted_type, x_max.dtype)
         )
-        x = jnp.where(x > x_max, x_max.astype(promoted_type), x.astype(promoted_type))
+        x = jnp.where(
+            x > x_max, jnp.astype(x_max, promoted_type), jnp.astype(x, promoted_type)
+        )
     return x
 
 

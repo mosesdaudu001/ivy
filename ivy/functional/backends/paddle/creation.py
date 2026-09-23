@@ -1,4 +1,5 @@
 # global
+import builtins
 import struct
 from numbers import Number
 from typing import Union, List, Optional, Sequence, Tuple
@@ -65,6 +66,14 @@ def arange(
         return paddle.arange(start, stop, step).cast(dtype)
 
 
+def complex(
+    real: paddle.Tensor,
+    imag: paddle.Tensor,
+    out: Optional[paddle.Tensor] = None,
+) -> paddle.Tensor:
+    return paddle.complex(real, imag)
+
+
 @_asarray_to_native_arrays_and_back
 @_asarray_infer_device
 @_asarray_handle_nestable
@@ -107,7 +116,7 @@ def asarray(
         ret = ret.astype(dtype) if ret.dtype != obj.dtype else ret
         return paddle_backend.to_device(ret, device)
 
-    elif isinstance(obj, (Number, bool, complex)):
+    elif isinstance(obj, (Number, bool, builtins.complex)):
         ret = paddle.to_tensor(obj, dtype=dtype, place=device)
 
         if ret.ndim != 0:  # for versions <2.5.0
@@ -152,6 +161,7 @@ def empty_like(
                 "complex64",
                 "complex128",
                 "bool",
+                "bfloat16",
             )
         }
     },
@@ -215,6 +225,17 @@ def from_dlpack(x, /, *, out: Optional[paddle.Tensor] = None):
     return paddle.utils.dlpack.from_dlpack(capsule)
 
 
+@with_unsupported_device_and_dtypes(
+    {
+        "2.6.0 and below": {
+            "cpu": (
+                "complex",
+                "bool",
+            )
+        }
+    },
+    backend_version,
+)
 def full(
     shape: Union[ivy.NativeShape, Sequence[int]],
     fill_value: Union[int, float, bool],
@@ -227,7 +248,7 @@ def full(
         dtype = ivy.default_dtype(item=fill_value)
     if not isinstance(shape, Sequence):
         shape = [shape]
-    if isinstance(fill_value, complex):
+    if isinstance(fill_value, builtins.complex):
         fill_value = paddle.to_tensor(fill_value)
         ret_real = paddle.full(shape=shape, fill_value=fill_value.real())
         ret_imag = paddle.full(shape=shape, fill_value=fill_value.imag())
@@ -499,14 +520,18 @@ def ones_like(
     return paddle_backend.ones(shape=x.shape, dtype=dtype, device=device)
 
 
-@with_unsupported_device_and_dtypes(
+@with_supported_device_and_dtypes(
     {
         "2.6.0 and below": {
             "cpu": (
-                "int8",
-                "int16",
-                "uint8",
-                "complex",
+                "int32",
+                "int64",
+                "float64",
+                "complex128",
+                "float16",
+                "float32",
+                "complex64",
+                "bool",
             )
         }
     },
@@ -526,6 +551,7 @@ def tril(
                 "int16",
                 "uint8",
                 "complex",
+                "bfloat16",
             )
         }
     },

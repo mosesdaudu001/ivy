@@ -82,13 +82,8 @@ def complex(
     *,
     out=None,
 ):
-    assert real.dtype == imag.dtype, TypeError(
-        "Expected real and imag to have the same dtype, "
-        f" but got real.dtype = {real.dtype} and imag.dtype = {imag.dtype}."
-    )
-
     complex_dtype = ivy.complex64 if real.dtype != ivy.float64 else ivy.complex128
-    complex_array = real + imag * 1j
+    complex_array = ivy.complex(real, imag, out=out)
     return complex_array.astype(complex_dtype, out=out)
 
 
@@ -157,11 +152,7 @@ def eye(
 
 
 @to_ivy_arrays_and_back
-def from_dlpack(ext_tensor):
-    return ivy.from_dlpack(ext_tensor)
-
-
-@to_ivy_arrays_and_back
+@with_unsupported_dtypes({"2.2 and below": ("bfloat16",)}, "torch")
 def from_numpy(data, /):
     return ivy.asarray(data, dtype=ivy.dtype(data))
 
@@ -178,6 +169,7 @@ def frombuffer(
     return ivy.frombuffer(buffer, dtype=dtype, count=count, offset=offset)
 
 
+@with_unsupported_dtypes({"2.2.0 and below": ("bfloat16",)}, "torch")
 @to_ivy_arrays_and_back
 def full(
     size,
@@ -226,8 +218,8 @@ def linspace(
     layout=None,
     requires_grad=False,
 ):
-    ret = ivy.linspace(start, end, num=steps, dtype=dtype, device=device, out=out)
-    return ret
+    dtype = torch_frontend.get_default_dtype() if dtype is None else dtype
+    return ivy.linspace(start, end, num=steps, dtype=dtype, device=device, out=out)
 
 
 @to_ivy_arrays_and_back
@@ -313,11 +305,6 @@ def range(
         step = 1
     elif len(args) == 3:
         start, end, step = args
-    else:
-        ivy.utils.assertions.check_true(
-            len(args) == 1 or len(args) == 3,
-            "only 1 or 3 positional arguments are supported",
-        )
     range_vec = []
     elem = start
     while 1:

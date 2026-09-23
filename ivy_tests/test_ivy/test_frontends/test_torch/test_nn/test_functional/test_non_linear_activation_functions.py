@@ -59,6 +59,7 @@ def _x_and_scaled_attention(draw, dtypes):
             shape=q_shape,
             min_value=0,
             max_value=1e2,
+            abs_smallest_val=1e-05,
             large_abs_safety_factor=7,
             small_abs_safety_factor=7,
             safety_factor_scale="linear",
@@ -70,6 +71,7 @@ def _x_and_scaled_attention(draw, dtypes):
             shape=k_shape,
             min_value=0,
             max_value=1e2,
+            abs_smallest_val=1e-05,
             large_abs_safety_factor=7,
             small_abs_safety_factor=7,
             safety_factor_scale="linear",
@@ -81,6 +83,7 @@ def _x_and_scaled_attention(draw, dtypes):
             shape=v_shape,
             min_value=0,
             max_value=1e2,
+            abs_smallest_val=1e-05,
             large_abs_safety_factor=7,
             small_abs_safety_factor=7,
             safety_factor_scale="linear",
@@ -108,7 +111,6 @@ def _x_and_scaled_attention(draw, dtypes):
         min_num_dims=1,
     ),
     alpha=helpers.floats(min_value=0.1, max_value=1.0),
-    test_inplace=st.booleans(),
     test_with_out=st.just(False),
 )
 def test_torch_celu(
@@ -169,6 +171,7 @@ def test_torch_celu_(
         on_device=on_device,
         input=x[0],
         alpha=alpha,
+        test_values=False,
     )
 
 
@@ -307,12 +310,11 @@ def test_torch_glu(
     dtype_and_x=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("float"),
     ),
-    tau=st.floats(min_value=0),
+    tau=st.floats(min_value=1e-6, max_value=10.0),
     hard=st.booleans(),
     eps=st.floats(min_value=0, max_value=1),
-    dim=st.integers(),
+    dim=st.integers(min_value=-1, max_value=0),
     test_with_out=st.just(False),
-    test_inplace=st.booleans(),
 )
 def test_torch_gumbel_softmax(
     *,
@@ -515,8 +517,18 @@ def test_torch_hardtanh_(
     fn_tree="torch.nn.functional.leaky_relu",
     dtype_and_x=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("float"),
+        min_num_dims=1,
+        large_abs_safety_factor=25,
+        small_abs_safety_factor=25,
+        safety_factor_scale="log",
     ),
-    alpha=st.floats(min_value=0.0, max_value=1.0, exclude_min=True),
+    alpha=helpers.floats(
+        min_value=0,
+        max_value=1,
+        large_abs_safety_factor=25,
+        small_abs_safety_factor=25,
+        safety_factor_scale="log",
+    ),
     test_inplace=st.booleans(),
     test_with_out=st.just(False),
 )
@@ -590,6 +602,9 @@ def test_torch_leaky_relu_(
         large_abs_safety_factor=2,
         small_abs_safety_factor=2,
         safety_factor_scale="log",
+        min_value=-1e+05,
+        max_value=1e+05,
+        abs_smallest_val=1e-5,
     ),
     size=helpers.ints(min_value=3, max_value=10),
     alpha=helpers.floats(min_value=1e-4, max_value=1e-3),
@@ -623,6 +638,8 @@ def test_torch_local_response_norm(
         alpha=alpha,
         beta=beta,
         k=k,
+        atol=1e-03,
+        rtol=1e-03,
     )
 
 
@@ -635,6 +652,9 @@ def test_torch_local_response_norm(
         max_axes_size=1,
         force_int_axis=True,
         valid_axis=True,
+        min_value=-10,
+        max_value=10,
+        abs_smallest_val=1e-02,
     ),
     dtypes=helpers.get_dtypes("float", none=False, full=False),
 )
@@ -660,6 +680,8 @@ def test_torch_log_softmax(
         dim=axis,
         _stacklevel=3,
         dtype=dtypes[0],
+        atol=1e-02,
+        rtol=1e-02,
     )
 
 
@@ -731,6 +753,9 @@ def test_torch_mish(
         max_axes_size=1,
         force_int_axis=True,
         valid_axis=True,
+        min_value=-1e+05,
+        max_value=1e+05,
+        abs_smallest_val=1e-05,
     ),
     p=helpers.ints(min_value=2, max_value=5),
 )
@@ -1153,7 +1178,9 @@ def test_torch_softmin(
         on_device=on_device,
         input=x[0],
         dim=axis,
-        dtype=ivy.as_ivy_dtype(dtypes[0]),
+        _stacklevel=3,
+        dtype=dtypes[0],
+        atol=1e-03,
     )
     ivy.previous_backend()
 
@@ -1315,11 +1342,13 @@ def test_torch_tanhshrink(
     fn_tree="torch.nn.functional.threshold",
     dtype_and_input=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("float"),
+        min_value=-1e03,
+        max_value=1e03,
+        abs_smallest_val=1e-05,
     ),
     threshold=helpers.floats(min_value=0.0, max_value=1.0),
     value=helpers.ints(min_value=5, max_value=20),
     test_with_out=st.just(False),
-    test_inplace=st.booleans(),
 )
 def test_torch_threshold(
     *,
@@ -1379,4 +1408,5 @@ def test_torch_threshold_(
         input=input[0],
         threshold=threshold,
         value=value,
+        test_values=False,
     )

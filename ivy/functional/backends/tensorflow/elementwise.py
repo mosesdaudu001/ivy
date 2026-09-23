@@ -4,8 +4,9 @@ import tensorflow as tf
 
 # local
 import ivy
-from ivy.func_wrapper import with_unsupported_dtypes, with_supported_dtypes
 from ivy import promote_types_of_inputs
+from ivy.func_wrapper import with_unsupported_dtypes, with_supported_dtypes
+from ivy.utils.exceptions import IvyNotImplementedException
 from . import backend_version
 
 
@@ -201,13 +202,14 @@ def ceil(
         return tf.math.ceil(x)
 
 
-@with_unsupported_dtypes({"2.15.0 and below": ("integer",)}, backend_version)
 def cos(
     x: Union[tf.Tensor, tf.Variable],
     /,
     *,
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Union[tf.Tensor, tf.Variable]:
+    if ivy.is_int_dtype(x.dtype):
+        x = tf.cast(x, tf.float32)
     return tf.cos(x)
 
 
@@ -423,7 +425,7 @@ def less(
     return tf.math.less(x1, x2)
 
 
-@with_unsupported_dtypes({"2.15.0 and below": ("complex",)}, backend_version)
+@with_unsupported_dtypes({"2.15.0 and below": ("complex", "bool")}, backend_version)
 def less_equal(
     x1: Union[float, tf.Tensor, tf.Variable],
     x2: Union[float, tf.Tensor, tf.Variable],
@@ -436,7 +438,7 @@ def less_equal(
 
 
 @with_unsupported_dtypes(
-    {"2.15.0 and below": ("float16", "bfloat16", "integer")}, backend_version
+    {"2.15.0 and below": ("float16", "bfloat16")}, backend_version
 )
 def log(
     x: Union[tf.Tensor, tf.Variable],
@@ -444,6 +446,8 @@ def log(
     *,
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Union[tf.Tensor, tf.Variable]:
+    if ivy.is_int_dtype(x):
+        x = tf.cast(x, ivy.default_float_dtype(input=x, as_native=True))
     return tf.math.log(x)
 
 
@@ -486,7 +490,7 @@ def logaddexp(
     return tf.experimental.numpy.logaddexp(x1, x2)
 
 
-@with_unsupported_dtypes({"2.15.0 and below": ("float16",)}, backend_version)
+@with_unsupported_dtypes({"2.15.0 and below": ("bool",)}, backend_version)
 def real(
     x: Union[tf.Tensor, tf.Variable],
     /,
@@ -706,6 +710,7 @@ def sinh(
     return tf.sinh(x)
 
 
+@with_unsupported_dtypes({"2.15.0 and below": ("integer",)}, backend_version)
 def sqrt(
     x: Union[tf.Tensor, tf.Variable],
     /,
@@ -740,6 +745,7 @@ def subtract(
     return tf.subtract(x1, x2)
 
 
+@with_unsupported_dtypes({"2.15.0 and below": ("integer",)}, backend_version)
 def tan(
     x: Union[tf.Tensor, tf.Variable],
     /,
@@ -749,6 +755,7 @@ def tan(
     return tf.tan(x)
 
 
+@with_unsupported_dtypes({"2.15.0 and below": ("integer",)}, backend_version)
 def tanh(
     x: Union[tf.Tensor, tf.Variable],
     /,
@@ -768,8 +775,8 @@ def trapz(
     axis: int = -1,
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Union[tf.Tensor, tf.Variable]:
-    pass
     # TODO: Implement purely in tensorflow
+    raise IvyNotImplementedException()
 
 
 @with_unsupported_dtypes({"2.15.0 and below": ("complex",)}, backend_version)
@@ -872,7 +879,10 @@ def deg2rad(
     return radians
 
 
-@with_supported_dtypes({"2.15.0 and below": ("float",)}, backend_version)
+@with_supported_dtypes(
+    {"2.15.0 and below": ("float16", "float32", "float64")},
+    backend_version,
+)
 def rad2deg(
     x: Union[tf.Tensor, tf.Variable],
     /,

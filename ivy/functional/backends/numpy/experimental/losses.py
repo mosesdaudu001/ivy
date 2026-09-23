@@ -1,6 +1,7 @@
 import numpy as np
 from ivy.functional.backends.numpy.helpers import _scalar_output_to_0d_array
 from ivy.func_wrapper import (
+    to_native_arrays_and_back,
     with_unsupported_dtypes,
     with_supported_device_and_dtypes,
 )
@@ -32,6 +33,7 @@ def huber_loss(
 
 # Implementation of smooth_l1_loss in the given format
 @with_unsupported_dtypes({"1.26.3 and below": ("bool",)}, backend_version)
+@to_native_arrays_and_back
 @_scalar_output_to_0d_array
 def smooth_l1_loss(
     input: np.ndarray,
@@ -56,6 +58,7 @@ def smooth_l1_loss(
 
 
 @with_unsupported_dtypes({"1.26.3 and below": ("bool",)}, backend_version)
+@to_native_arrays_and_back
 @_scalar_output_to_0d_array
 def soft_margin_loss(
     input: np.ndarray,
@@ -64,7 +67,7 @@ def soft_margin_loss(
     *,
     reduction: str = "mean",
 ) -> np.ndarray:
-    loss = np.sum(np.log1p(np.exp(-input * target))) / input.size
+    loss = np.log1p(np.exp(-input * target))
 
     if reduction == "mean":
         return np.mean(loss)

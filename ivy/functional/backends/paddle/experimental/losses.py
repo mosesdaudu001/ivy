@@ -6,6 +6,7 @@ import math
 
 # local
 from ivy.func_wrapper import (
+    to_native_arrays_and_back,
     with_unsupported_device_and_dtypes,
     with_supported_device_and_dtypes,
 )
@@ -57,6 +58,7 @@ def l1_loss(
     },
     backend_version,
 )
+@to_native_arrays_and_back
 def smooth_l1_loss(
     input: paddle.Tensor,
     target: paddle.Tensor,
@@ -116,6 +118,7 @@ def huber_loss(
     },
     backend_version,
 )
+@to_native_arrays_and_back
 def soft_margin_loss(
     input: paddle.Tensor,
     label: paddle.Tensor,

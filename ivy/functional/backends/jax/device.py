@@ -5,7 +5,6 @@ signature."""
 import os
 import jax
 from typing import Union, Optional
-import jaxlib.xla_extension
 
 # local
 import ivy
@@ -27,6 +26,8 @@ def _to_array(x):
         return _to_array(x.aval)
     elif isinstance(x, jax.interpreters.batching.BatchTracer):
         return _to_array(x.val)
+    elif 'flax.nnx.nnx.variables' in str(x.__class__):
+        return x.value
     return x
 
 
@@ -39,7 +40,7 @@ def dev(
     /,
     *,
     as_native: bool = False,
-) -> Union[ivy.Device, jaxlib.xla_extension.Device]:
+) -> Union[ivy.Device, jax.Device]:
     if isinstance(x, jax.interpreters.partial_eval.DynamicJaxprTracer):
         return ""
     if hasattr(x, "device_buffer"):
@@ -51,7 +52,7 @@ def dev(
 
 def to_device(
     x: JaxArray,
-    device: jaxlib.xla_extension.Device,
+    device: jax.Device,
     /,
     *,
     stream: Optional[int] = None,

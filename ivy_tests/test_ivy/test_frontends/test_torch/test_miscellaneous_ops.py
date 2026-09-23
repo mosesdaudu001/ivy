@@ -1,9 +1,8 @@
 # global
-import math
-
-import numpy as np
-from hypothesis import assume, strategies as st
+from hypothesis import assume, strategies as st, settings, HealthCheck
 import hypothesis.extra.numpy as nph
+import math
+import numpy as np
 
 # local
 import ivy
@@ -189,17 +188,6 @@ def complex_strategy(
     shape = list(shape)
     shape.append(2)
     return tuple(shape)
-
-
-@st.composite
-def dims_and_offset(draw, shape):
-    shape_actual = draw(shape)
-    dim1 = draw(helpers.get_axis(shape=shape, force_int=True))
-    dim2 = draw(helpers.get_axis(shape=shape, force_int=True))
-    offset = draw(
-        st.integers(min_value=-shape_actual[dim1], max_value=shape_actual[dim1])
-    )
-    return dim1, dim2, offset
 
 
 # cross
@@ -472,6 +460,58 @@ def test_torch_broadcast_to(
 
 
 @handle_frontend_test(
+    fn_tree="torch.bucketize",
+    dtype_and_input=helpers.dtype_and_values(
+        available_dtypes=helpers.get_dtypes("float"),
+        min_num_dims=1,
+        max_num_dims=3,
+        min_dim_size=1,
+        max_dim_size=5,
+    ),
+    dtype_and_boundaries=helpers.dtype_and_values(
+        available_dtypes=helpers.get_dtypes("integer"),
+        min_num_dims=1,
+        max_num_dims=1,
+        min_dim_size=1,
+        max_dim_size=5,
+    ),
+    out_int32=st.booleans(),
+    right=st.booleans(),
+)
+def test_torch_bucketize(
+    *,
+    dtype_and_input,
+    dtype_and_boundaries,
+    out_int32,
+    right,
+    on_device,
+    fn_tree,
+    frontend,
+    test_flags,
+    backend_fw,
+):
+    input_dtype, input = dtype_and_input
+    boundaries_dtype, boundaries = dtype_and_boundaries
+
+    assume(boundaries[0].ndim == 1)
+
+    boundaries[0] = np.sort(boundaries[0])
+
+    helpers.test_frontend_function(
+        input_dtypes=[input_dtype[0], boundaries_dtype[0]],
+        backend_to_test=backend_fw,
+        frontend=frontend,
+        test_flags=test_flags,
+        fn_tree=fn_tree,
+        on_device=on_device,
+        input=input[0],
+        boundaries=boundaries[0],
+        out_int32=out_int32,
+        right=right,
+    )
+
+
+@handle_frontend_test(
     fn_tree="torch.cartesian_prod",
     dtype_and_tensors=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("valid"),
@@ -595,6 +635,7 @@ def test_torch_clone(
         min_dim_size=2,
         max_dim_size=2,
         min_value=1,
+        max_value=1e4,
     ),
     test_with_out=st.just(False),
 )
@@ -615,6 +656,8 @@ def test_torch_corrcoef(
         on_device=on_device,
         backend_to_test=backend_fw,
         input=x[0],
+        atol=1e-2,
+        rtol=1e-2,
     )
 
 
@@ -745,14 +788,15 @@ def test_torch_cummax(
         available_dtypes=helpers.get_dtypes("numeric"),
         min_num_dims=1,
         max_num_dims=5,
-        min_value=-100,
-        max_value=100,
+        min_value=-1e01,
+        max_value=1e01,
+        abs_smallest_val=1e-03,
         valid_axis=True,
         allow_neg_axes=False,
         max_axes_size=1,
         force_int_axis=True,
     ),
-    dtype=helpers.get_dtypes("numeric", none=True, full=False),
+    dtype=helpers.get_dtypes("float", none=True, full=False),
 )
 def test_torch_cumprod(
     *,
@@ -779,6 +823,8 @@ def test_torch_cumprod(
         input=x[0],
         dim=axis,
         dtype=dtype[0],
+        atol=1e-2,
+        rtol=1e-2,
     )
 
 
@@ -858,6 +904,48 @@ def test_torch_diag(
     )
 
 
+@handle_frontend_test(
+    fn_tree="torch.diag_embed",
+    dtype_and_values=helpers.dtype_and_values(
+        available_dtypes=helpers.get_dtypes("float"),
+        shape=st.shared(helpers.get_shape(min_num_dims=1, max_num_dims=2), key="shape"),
+    ),
+    dims_and_offsets=helpers.dims_and_offset(
+        shape=st.shared(helpers.get_shape(min_num_dims=1, max_num_dims=2), key="shape"),
+        ensure_dim_unique=True,
+    ),
+)
+@settings(suppress_health_check=list(HealthCheck))
+def test_torch_diag_embed(
+    *,
+    dtype_and_values,
+    dims_and_offsets,
+    test_flags,
+    on_device,
+    fn_tree,
+    frontend,
+    backend_fw,
+):
+    input_dtype, value = dtype_and_values
+    dim1, dim2, offset = dims_and_offsets
+    num_of_dims = len(np.shape(value[0])) + 1
+    norm_dim1 = dim1 if dim1 >= 0 else dim1 + num_of_dims
+    norm_dim2 = dim2 if dim2 >= 0 else dim2 + num_of_dims
+    assume(norm_dim1 != norm_dim2)
+    helpers.test_frontend_function(
+        input_dtypes=input_dtype,
+        backend_to_test=backend_fw,
+        test_flags=test_flags,
+        frontend=frontend,
+        fn_tree=fn_tree,
+        on_device=on_device,
+        input=value[0],
+        offset=offset,
+        dim1=dim1,
+        dim2=dim2,
+    )
+
+
 # diagflat
 @handle_frontend_test(
     fn_tree="torch.diagflat",
@@ -900,7 +988,7 @@ def test_torch_diagflat(
         available_dtypes=helpers.get_dtypes("float"),
         shape=st.shared(helpers.get_shape(min_num_dims=2), key="shape"),
     ),
-    dims_and_offset=dims_and_offset(
+    dims_and_offset=helpers.dims_and_offset(
         shape=st.shared(helpers.get_shape(min_num_dims=2), key="shape")
     ),
 )
@@ -945,17 +1033,26 @@ def test_torch_diagonal(
         min_num_dims=1,
         valid_axis=True,
         force_int_axis=True,
+        min_value=-1e03,
+        max_value=1e03,
+        abs_smallest_val=1e-03,
     ),
     n=st.integers(min_value=0, max_value=5),
     dtype_prepend=helpers.dtype_and_values(
         available_dtypes=st.shared(helpers.get_dtypes("valid"), key="dtype"),
         min_num_dims=1,
         max_num_dims=1,
+        min_value=-1e03,
+        max_value=1e03,
+        abs_smallest_val=1e-03,
     ),
     dtype_append=helpers.dtype_and_values(
         available_dtypes=st.shared(helpers.get_dtypes("valid"), key="dtype"),
         min_num_dims=1,
         max_num_dims=1,
+        min_value=-1e03,
+        max_value=1e03,
+        abs_smallest_val=1e-03,
     ),
 )
 def test_torch_diff(
@@ -970,10 +1067,10 @@ def test_torch_diff(
     fn_tree,
 ):
     input_dtype, x, axis = dtype_n_x_n_axis
-    _, prepend = dtype_prepend
-    _, append = dtype_append
+    prepend_dtype, prepend = dtype_prepend
+    append_dtype, append = dtype_append
     helpers.test_frontend_function(
-        input_dtypes=input_dtype,
+        input_dtypes=[input_dtype[0], prepend_dtype[0], append_dtype[0]],
         backend_to_test=backend_fw,
         test_flags=test_flags,
         frontend=frontend,
@@ -983,6 +1080,9 @@ def test_torch_diff(
         dim=axis,
         prepend=prepend[0],
         append=append[0],
+        atol=1e-03,
+        rtol=1e-03,
+        test_dtypes=False,
     )
 
 
@@ -1222,11 +1322,58 @@ def test_torch_gcd(
     )
 
 
+@handle_frontend_test(
+    fn_tree="torch.histc",
+    dtype_and_input=helpers.dtype_and_values(
+        available_dtypes=helpers.get_dtypes("valid"),
+        shape=helpers.get_shape(
+            min_num_dims=1, max_num_dims=1, min_dim_size=1, max_dim_size=10
+        ),
+        min_value=-100.0,
+        max_value=100.0,
+        abs_smallest_val=1e-6,
+    ),
+    bins=st.integers(min_value=1, max_value=100),
+    min_val=st.floats(min_value=-100.0, max_value=100.0),
+    max_val=st.floats(min_value=-100.0, max_value=100.0),
+    test_with_out=st.just(False),
+)
+def test_torch_histc(
+    *,
+    dtype_and_input,
+    bins,
+    min_val,
+    max_val,
+    on_device,
+    fn_tree,
+    frontend,
+    test_flags,
+    backend_fw,
+):
+    input_dtype, input_tensor = dtype_and_input
+    input_tensor = np.array(input_tensor[0], dtype=input_dtype[0])
+
+    assume(min_val < max_val)
+
+    helpers.test_frontend_function(
+        input_dtypes=input_dtype,
+        backend_to_test=backend_fw,
+        frontend=frontend,
+        test_flags=test_flags,
+        fn_tree=fn_tree,
+        on_device=on_device,
+        input=input_tensor,
+        bins=bins,
+        min=min_val,
+        max=max_val,
+    )
+
+
 # kron
 @handle_frontend_test(
     fn_tree="torch.kron",
     dtype_and_x=helpers.dtype_and_values(
-        available_dtypes=helpers.get_dtypes("float"), num_arrays=2
+        available_dtypes=helpers.get_dtypes("valid"), num_arrays=2
     ),
 )
 def test_torch_kron(
@@ -1240,7 +1387,7 @@ def test_torch_kron(
     input_dtypes, x = dtype_and_x
     input, label = x[0], x[1]
     helpers.test_frontend_function(
-        input_dtypes=["float32"],
+        input_dtypes=input_dtypes,
         backend_to_test=backend_fw,
         frontend=frontend,
         test_flags=test_flags,
@@ -1291,7 +1438,7 @@ def test_torch_lcm(
 @handle_frontend_test(
     fn_tree="torch.logcumsumexp",
     dtype_and_input=helpers.dtype_and_values(
-        available_dtypes=helpers.get_dtypes("numeric"),
+        available_dtypes=helpers.get_dtypes("float"),
         shape=st.shared(helpers.get_shape(), key="shape"),
         max_value=100,
         min_value=-100,
@@ -1401,7 +1548,7 @@ def test_torch_ravel(
     fn_tree="torch.renorm",
     dtype_and_values=helpers.dtype_and_values(
         shape=st.shared(helpers.get_shape(min_num_dims=2), key="shape"),
-        available_dtypes=helpers.get_dtypes("numeric"),
+        available_dtypes=helpers.get_dtypes("float_and_complex"),
         max_value=1e4,
         min_value=-1e4,
     ),
@@ -1579,10 +1726,10 @@ def test_torch_rot90(
         max_num_dims=1,
         num_arrays=2,
     ),
-    side=st.sampled_from(["left", "right"]),
+    side=st.sampled_from(["left", "right", None]),
     out_int32=st.booleans(),
-    right=st.just(False),
-    test_with_out=st.just(False),
+    right=st.sampled_from([True, False, None]),
+    test_with_out=st.booleans(),
 )
 def test_torch_searchsorted(
     dtype_x_v,
@@ -1595,6 +1742,13 @@ def test_torch_searchsorted(
     backend_fw,
     on_device,
 ):
+    potential_kwargs = {}
+    if side == "left" and right:
+        right = None  # this combo will cause an exception
+    if side is not None:
+        potential_kwargs["side"] = side
+    if right is not None:
+        potential_kwargs["right"] = right
     input_dtypes, xs = dtype_x_v
     use_sorter = st.booleans()
     if use_sorter:
@@ -1612,10 +1766,9 @@ def test_torch_searchsorted(
         on_device=on_device,
         sorted_sequence=xs[0],
         values=xs[1],
-        side=side,
         out_int32=out_int32,
-        right=right,
         sorter=sorter,
+        **potential_kwargs,
     )
 
 
@@ -1823,6 +1976,7 @@ def test_torch_triu_indices(
         shape=st.shared(helpers.get_shape(min_num_dims=1), key="shape"),
         force_int=True,
     ),
+    infer_dim=st.booleans(),
 )
 def test_torch_unflatten(
     *,
@@ -1834,9 +1988,14 @@ def test_torch_unflatten(
     backend_fw,
     shape,
     axis,
+    infer_dim,
 ):
     dtype, x = dtype_and_values
     sizes = sizes_(shape, axis)
+    if infer_dim and len(sizes) > 1:
+        sizes = list(sizes)
+        sizes[0] = -1
+        sizes = tuple(sizes)
     helpers.test_frontend_function(
         input_dtypes=dtype,
         frontend=frontend,

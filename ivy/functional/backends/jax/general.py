@@ -1,37 +1,31 @@
 """Collection of Jax general functions, wrapped to fit Ivy syntax and
 signature."""
 
-# global
-import jax
-import numpy as np
-import jax.numpy as jnp
+import importlib
+import multiprocessing as _multiprocessing
+from functools import reduce as _reduce
 from numbers import Number
 from operator import mul
-from functools import reduce as _reduce
-from typing import Optional, Union, Sequence, Callable, Tuple
-import multiprocessing as _multiprocessing
-import importlib
+from typing import Optional, Union, Sequence, Callable, Tuple, List, Type
 
+# global
+import jax
+import jax.numpy as jnp
+import numpy as np
 
 # local
 import ivy
 from ivy.func_wrapper import with_unsupported_dtypes
+from ivy.functional.backends.jax import JaxArray, NativeArray
 from ivy.functional.backends.jax.device import _to_array, _to_device
 from ivy.functional.ivy.general import _broadcast_to
-from ivy.functional.backends.jax import JaxArray, NativeArray
 from ivy.utils.exceptions import _check_inplace_update_support
+
 from . import backend_version
 
 
 def container_types():
-    flat_mapping_spec = importlib.util.find_spec(
-        "FlatMapping", "haiku._src.data_structures"
-    )
-    if not flat_mapping_spec:
-        from haiku._src.data_structures import FlatMapping
-    else:
-        FlatMapping = importlib.util.module_from_spec(flat_mapping_spec)
-    return [FlatMapping]
+    return []
 
 
 def current_backend_str() -> str:
@@ -41,6 +35,12 @@ def current_backend_str() -> str:
 def is_native_array(x, /, *, exclusive=False):
     if exclusive:
         return isinstance(x, NativeArray)
+    elif any(
+        cls in str(x.__class__)
+        for cls in ["flax.nnx.nnx.variables", "flax.nnx.variablelib", "flax.core.scope.Variable"]
+    ):
+        # ensure flax Variables(linen, nnx) classify as a native array if `exclusive` is False
+        return True
     return isinstance(
         x,
         (
@@ -68,6 +68,8 @@ def get_item(
     *,
     copy: Optional[bool] = None,
 ) -> JaxArray:
+    if copy:
+        x = x.copy()
     if ivy.is_array(query) and ivy.is_bool_dtype(query):
         if not len(query.shape):
             if not query:
@@ -88,8 +90,16 @@ def set_item(
     *,
     copy: Optional[bool] = False,
 ) -> JaxArray:
+    
+    if isinstance(query, (list,tuple)) and (query == [] or query == ()):
+        return x
+    # convert nnx.Param to jax.Array
+    if hasattr(x, "value"):
+        x = x.value 
     if ivy.is_array(query) and ivy.is_bool_dtype(query):
         query = _mask_to_index(query, x)
+    if isinstance(query, list) and isinstance(query[0], int):
+        query = jax.numpy.asarray(query)
     expected_shape = x[query].shape
     if ivy.is_array(val):
         val = _broadcast_to(val, expected_shape)._data
@@ -178,7 +188,7 @@ def gather_nd_helper(params, indices):
         (indices_for_flat_tiled.shape[0], 1),
     )
     indices_for_flat = indices_for_flat_tiled + implicit_indices
-    flat_indices_for_flat = jnp.reshape(indices_for_flat, (-1,)).astype(jnp.int32)
+    flat_indices_for_flat = jnp.astype(jnp.reshape(indices_for_flat, (-1,)), jnp.int32)
     flat_gather = jnp.take(flat_params, flat_indices_for_flat, 0)
     new_shape = list(indices_shape[:-1]) + list(params_shape[num_index_dims:])
     ret = jnp.reshape(flat_gather, new_shape)
@@ -217,6 +227,10 @@ def gather_nd(
 
 def get_num_dims(x: JaxArray, /, *, as_array: bool = False) -> Union[JaxArray, int]:
     return jnp.asarray(len(jnp.shape(x))) if as_array else len(x.shape)
+
+
+def size(x: JaxArray, /) -> int:
+    return x.size
 
 
 def inplace_arrays_supported():
@@ -273,7 +287,7 @@ def inplace_update(
                     val_native.flatten()
                 )
 
-                base.data = base_flat.reshape(base.shape)
+                base.data = jnp.reshape(base_flat, base.shape)
 
                 for ref in base._view_refs:
                     view = ref()

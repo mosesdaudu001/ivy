@@ -191,8 +191,11 @@ def matrix_norm(
     ord: Union[int, float, Literal[inf, -inf, "fro", "nuc"]] = "fro",
     axis: Tuple[int, int] = (-2, -1),
     keepdims: bool = False,
+    dtype: Optional[jnp.dtype] = None,
     out: Optional[JaxArray] = None,
 ) -> JaxArray:
+    if dtype is not None:
+        x = ivy.astype(x, dtype).to_native()
     if hasattr(axis, "__iter__"):
         if not isinstance(axis, tuple):
             axis = tuple(axis)
@@ -427,11 +430,11 @@ def vector_norm(
     dtype: Optional[jnp.dtype] = None,
 ) -> JaxArray:
     if dtype and x.dtype != dtype:
-        x = x.astype(dtype)
+        x = jnp.astype(x, dtype)
     abs_x = jnp.abs(x)
     if ord == 0:
         return jnp.sum(
-            (abs_x != 0).astype(abs_x.dtype), axis=axis, keepdims=keepdims, out=out
+            jnp.astype((abs_x != 0), abs_x.dtype), axis=axis, keepdims=keepdims, out=out
         )
     elif ord == inf:
         return jnp.max(abs_x, axis=axis, keepdims=keepdims, out=out)

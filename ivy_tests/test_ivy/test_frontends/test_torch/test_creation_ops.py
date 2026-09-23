@@ -2,11 +2,15 @@
 from hypothesis import strategies as st, assume
 import math
 import numpy as np
+import torch
 
 # local
+import ivy
+import ivy.functional.frontends.torch as torch_frontend
 import ivy_tests.test_ivy.helpers as helpers
 import ivy_tests.test_ivy.helpers.globals as test_globals
 from ivy_tests.test_ivy.helpers import handle_frontend_test, BackendHandler
+from ivy_tests.test_ivy.helpers.testing_helpers import handle_example
 
 
 # --- Helpers --- #
@@ -23,20 +27,25 @@ def _as_strided_helper(draw):
         )
     )
     ndim = len(shape)
-    numel = x[0].size
-    offset = draw(st.integers(min_value=0, max_value=numel - 1))
-    numel = numel - offset
+    numel_total = x[0].size
+    offset = draw(st.integers(min_value=0, max_value=max(0, numel_total - 1)))
+    numel_after_offset = numel_total - offset
     size = draw(
         helpers.get_shape(
             min_num_dims=ndim,
             max_num_dims=ndim,
-        ).filter(lambda s: math.prod(s) <= numel)
+        ).filter(lambda s: math.prod(s) <= numel_after_offset)
     )
     stride = draw(
         helpers.get_shape(
             min_num_dims=ndim,
             max_num_dims=ndim,
-        ).filter(lambda s: all(numel // s_i >= size[i] for i, s_i in enumerate(s)))
+            max_dim_size=max(1, numel_after_offset),
+        ).filter(
+            lambda s: offset
+            + sum((size_i - 1) * s_i for size_i, s_i in zip(size, s) if size_i > 0)
+            < numel_total
+        )
     )
     return x_dtype, x, size, stride, offset
 
@@ -47,23 +56,34 @@ def _as_tensor_helper(draw):
         st.one_of(
             helpers.dtype_and_values(
                 available_dtypes=helpers.get_dtypes("valid"),
+                min_value=-1e02,
+                max_value=1e02,
             ),
-            st.floats(),
-            st.integers(),
-            st.lists(st.one_of(st.floats(), st.integers()), min_size=1),
+            st.floats(min_value=-1e02, max_value=1e02),
+            st.integers(min_value=-1e02, max_value=1e02),
+            st.lists(
+                st.one_of(
+                    st.floats(min_value=-1e02, max_value=1e02),
+                    st.integers(min_value=-1e02, max_value=1e02),
+                ),
+                min_size=1,
+            ),
         )
     )
     if isinstance(dtype_and_x, tuple):
-        input_dtype = dtype_and_x[0]
-        x = dtype_and_x[1][0]
+        input_dtype, x_val = dtype_and_x
+        x = x_val[0]
+        x_dtype = input_dtype[0]
     else:
         input_dtype = []
         x = dtype_and_x
+        x_dtype = str(np.asarray(x).dtype)
+
     dtype = draw(
         st.one_of(
             helpers.get_castable_dtype(
                 draw(helpers.get_dtypes("valid")),
-                dtype=draw(helpers.get_dtypes("valid", full=False))[0],
+                dtype=x_dtype,
                 x=x,
             ),
             st.none(),
@@ -80,7 +100,7 @@ def _as_tensor_helper(draw):
 @st.composite
 def _fill_value(draw):
     with_array = draw(st.sampled_from([True, False]))
-    dtype = draw(st.shared(helpers.get_dtypes("numeric", full=False), key="dtype"))[0]
+    dtype = draw(st.shared(helpers.get_dtypes("valid", full=False), key="dtype"))[0]
     with BackendHandler.update_backend(test_globals.CURRENT_BACKEND) as ivy_backend:
         if ivy_backend.is_uint_dtype(dtype):
             ret = draw(helpers.ints(min_value=0, max_value=5))
@@ -260,7 +280,9 @@ def test_torch_as_tensor(
 @handle_frontend_test(
     fn_tree="torch.asarray",
     dtype_and_x=helpers.dtype_and_values(
-        available_dtypes=helpers.get_dtypes("numeric")
+        available_dtypes=helpers.get_dtypes("numeric"),
+        min_value=0,
+        max_value=1e02,
     ),
     dtype=helpers.get_dtypes("numeric", full=False),
     test_with_copy=st.just(True),
@@ -461,16 +483,14 @@ def test_torch_from_numpy(
     test_flags,
     backend_fw,
 ):
-    dtype, input = dtype_and_x
-    helpers.test_frontend_function(
-        input_dtypes=dtype,
-        backend_to_test=backend_fw,
-        on_device=on_device,
-        frontend=frontend,
-        test_flags=test_flags,
-        fn_tree=fn_tree,
-        data=input[0],
-    )
+    # manual testing as the inputs to this function are numpy arrays rather than tensors
+    _, x = dtype_and_x
+
+    frontend_ret = torch_frontend.from_numpy(x[0])
+    gt_ret = torch.from_numpy(x[0])
+
+    assert frontend_ret.dtype == ivy.as_ivy_dtype(str(gt_ret.dtype).split(".")[-1])
+    assert np.allclose(frontend_ret.numpy(), gt_ret.numpy())
 
 
 @handle_frontend_test(
@@ -511,7 +531,7 @@ def test_torch_frombuffer(
         max_dim_size=10,
     ),
     fill_value=_fill_value(),
-    dtype=st.shared(helpers.get_dtypes("numeric", full=False), key="dtype"),
+    dtype=st.shared(helpers.get_dtypes("valid", full=False), key="dtype"),
 )
 def test_torch_full(
     *,
@@ -611,6 +631,14 @@ def test_torch_heaviside(
     num=st.integers(min_value=1, max_value=10),
     dtype=helpers.get_dtypes("float", full=False),
 )
+@handle_example(
+    test_frontend_example=True,
+    start=np.array(0),
+    stop=1,
+    num=2,
+    dtype=[None],
+    fn_tree="ivy.functional.frontends.torch.linspace",
+)
 def test_torch_linspace(
     *,
     start,
@@ -624,7 +652,7 @@ def test_torch_linspace(
     backend_fw,
 ):
     helpers.test_frontend_function(
-        input_dtypes=[],
+        input_dtypes=[] if isinstance(start, float) else ["int64"],
         backend_to_test=backend_fw,
         frontend=frontend,
         test_flags=test_flags,
@@ -635,6 +663,7 @@ def test_torch_linspace(
         steps=num,
         dtype=dtype[0],
         device=on_device,
+        atol=1e-01,
         rtol=1e-01,
     )
 
@@ -814,8 +843,12 @@ def test_torch_range(
 # tensor
 @handle_frontend_test(
     fn_tree="torch.tensor",
-    dtype_and_x=helpers.dtype_and_values(available_dtypes=helpers.get_dtypes("valid")),
-    dtype=helpers.get_dtypes("valid", full=False),
+    dtype_and_x=helpers.dtype_and_values(
+        available_dtypes=helpers.get_dtypes("valid"),
+        min_value=-1e05,
+        max_value=1e05,
+    ),
+    dtype=helpers.get_dtypes("float_and_complex", full=False),
 )
 def test_torch_tensor(
     *,

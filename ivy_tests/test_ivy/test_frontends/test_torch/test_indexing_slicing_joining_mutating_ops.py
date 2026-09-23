@@ -1,9 +1,7 @@
 # global
-import random
-
-from hypothesis import strategies as st
+from hypothesis import assume, strategies as st
 import math
-
+import random
 
 # local
 import ivy
@@ -1356,11 +1354,13 @@ def test_torch_squeeze(
     dim=helpers.get_axis(
         shape=st.shared(helpers.get_shape(min_num_dims=1), key="shape"),
     ).filter(lambda axis: isinstance(axis, int)),
+    use_axis_arg=st.booleans(),
 )
 def test_torch_stack(
     *,
     dtype_value_shape,
     dim,
+    use_axis_arg,
     on_device,
     fn_tree,
     frontend,
@@ -1368,6 +1368,7 @@ def test_torch_stack(
     backend_fw,
 ):
     input_dtype, value = dtype_value_shape
+    dim_arg = {"axis" if use_axis_arg else "dim": dim}
     helpers.test_frontend_function(
         input_dtypes=input_dtype,
         backend_to_test=backend_fw,
@@ -1376,7 +1377,7 @@ def test_torch_stack(
         fn_tree=fn_tree,
         on_device=on_device,
         tensors=value,
-        dim=dim,
+        **dim_arg,
     )
 
 

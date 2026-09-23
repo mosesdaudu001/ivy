@@ -410,7 +410,9 @@ def conv3d_transpose(
     return res
 
 
-@with_unsupported_dtypes({"2.15.0 and below": ("bfloat16", "complex")}, backend_version)
+@with_unsupported_dtypes(
+    {"2.15.0 and below": ("bfloat16", "complex", "integer")}, backend_version
+)
 def conv_general_dilated(
     x: Union[tf.Tensor, tf.Variable],
     filters: Union[tf.Tensor, tf.Variable],
@@ -788,7 +790,7 @@ def lstm_update(
     recurrent_bias = (
         recurrent_bias.data if recurrent_bias is not None else recurrent_bias
     )
-    if "cpu" in dev:
+    if "cpu" in dev.lower():
         outputs, new_states = _cpu_lstm(
             x,
             init_h,

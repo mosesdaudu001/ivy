@@ -22,17 +22,15 @@ with_time_logs/
 *.jpeg
 *.gif
 *.so
+*.pyd
 .hypothesis
-.array_api_tests_k_flag*
-internal_automation_tools/
 .vscode/*
 .idea/*
 .ivy/*
-*.so
 .DS_Store*
 fn_path_cache
-ivy/engines/XLA/rust_api/target/
-ivy/engines/XLA/rust_api/xla_extension/
+ivy_transpiled_outputs/
+ivy_logs.txt
 
 # Environments
 .env
@@ -45,3 +43,8 @@ venv.bak/
 ivy_dev/
 *venv/
 venv*
+
+# Local docs build (see docs/make_docs.sh)
+.doc-builder/
+docs.old/
+docs/build/

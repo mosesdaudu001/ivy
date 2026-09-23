@@ -2,6 +2,7 @@ import tensorflow as tf
 import math
 from typing import Optional
 from ivy.func_wrapper import (
+    to_native_arrays_and_back,
     with_unsupported_dtypes,
     with_supported_device_and_dtypes,
 )
@@ -20,17 +21,18 @@ def huber_loss(
     abs_diff = tf.abs(input - target)
     quadratic_loss = 0.5 * (abs_diff**2)
     linear_loss = delta * (abs_diff - 0.5 * delta)
-    loss = tf.where(abs_diff <= delta, quadratic_loss, linear_loss)
+    loss = tf.cast(tf.where(abs_diff <= delta, quadratic_loss, linear_loss), input.dtype)
 
     if reduction == "sum":
-        return tf.sum(loss)
+        return tf.reduce_sum(loss)
     elif reduction == "mean":
-        return tf.mean(loss)
+        return tf.reduce_mean(loss)
     else:
         return loss
 
 
 @with_unsupported_dtypes({"2.15.0 and below": "bool"}, backend_version)
+@to_native_arrays_and_back
 def smooth_l1_loss(
     input: tf.Tensor,
     target: tf.Tensor,
@@ -51,6 +53,7 @@ def smooth_l1_loss(
 
 
 @with_unsupported_dtypes({"2.15.0 and below": "bool"}, backend_version)
+@to_native_arrays_and_back
 def soft_margin_loss(
     input: tf.Tensor,
     target: tf.Tensor,
@@ -58,7 +61,7 @@ def soft_margin_loss(
     *,
     reduction: Optional[str] = "mean",
 ) -> tf.Tensor:
-    loss = tf.reduce_sum(tf.math.log1p(tf.exp(-input * target))) / tf.size(input)
+    loss = tf.math.log1p(tf.exp(-input * target))
 
     if reduction == "sum":
         return tf.reduce_sum(loss)

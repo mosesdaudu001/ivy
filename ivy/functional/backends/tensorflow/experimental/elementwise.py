@@ -72,8 +72,9 @@ def sinc(
     *,
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Union[tf.Tensor, tf.Variable]:
+    original_dtype = x.dtype
     x = ivy.pi * x
-    return tf.cast(tf.where(x == 0, 1, tf.math.sin(x) / x), x.dtype)
+    return tf.cast(tf.where(x == 0, 1, tf.math.sin(x) / x), original_dtype)
 
 
 @with_supported_dtypes(
@@ -243,11 +244,24 @@ def diff(
     out: Optional[Union[tf.Tensor, tf.Variable]] = None,
 ) -> Union[tf.Tensor, tf.Variable]:
     if n == 0:
-        return x
+        return tf.experimental.numpy.asanyarray(x)
+
+    x = tf.convert_to_tensor(x)
+
     if prepend is not None:
-        x = tf.experimental.numpy.append(prepend, x, axis=axis if axis != -1 else None)
+        prepend = tf.convert_to_tensor(prepend)
+        promoted_type = tf.experimental.numpy.result_type(x.dtype, prepend.dtype)
+        x = tf.concat(
+            [tf.cast(prepend, promoted_type), tf.cast(x, promoted_type)], axis=axis
+        )
+
     if append is not None:
-        x = tf.experimental.numpy.append(x, append, axis=axis if axis != -1 else None)
+        append = tf.convert_to_tensor(append)
+        promoted_type = tf.experimental.numpy.result_type(x.dtype, append.dtype)
+        x = tf.concat(
+            [tf.cast(x, promoted_type), tf.cast(append, promoted_type)], axis=axis
+        )
+
     return tf.experimental.numpy.diff(x, n=n, axis=axis)
 
 

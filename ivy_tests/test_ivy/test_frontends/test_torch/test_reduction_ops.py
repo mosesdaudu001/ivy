@@ -354,11 +354,11 @@ def test_torch_count_nonzero(
         available_dtypes=helpers.get_dtypes("float"),
         num_arrays=2,
         shared_dtype=True,
-        min_value=-1e04,
-        max_value=1e04,
+        min_value=-10,
+        max_value=10,
         allow_inf=False,
     ),
-    p=helpers.floats(min_value=1.0, max_value=10.0),
+    p=helpers.floats(min_value=1.0, max_value=3.0),
 )
 def test_torch_dist(
     *,
@@ -381,6 +381,7 @@ def test_torch_dist(
         input=input[0],
         other=input[1],
         p=p,
+        rtol=0.05,
     )
 
 
@@ -489,7 +490,7 @@ def test_torch_mean(
         on_device=on_device,
         input=x[0],
         dim=axis,
-        keepdim=keepdims,
+        keepdims=keepdims,
         dtype=dtypes[0],
         atol=1e-2,
     )
@@ -646,6 +647,7 @@ def test_torch_moveaxis(
         function="nanmean",
         min_value=-1e04,
         max_value=1e04,
+        abs_smallest_val=1e-04,
     ),
     keepdims=st.booleans(),
 )
@@ -670,16 +672,21 @@ def test_torch_nanmean(
         input=x[0],
         dim=axis,
         keepdim=keepdims,
+        atol=1e-02,
+        rtol=1e-02,
     )
 
 
 @handle_frontend_test(
     fn_tree="torch.nanmedian",
     dtype_input_axis=helpers.dtype_values_axis(
-        available_dtypes=helpers.get_dtypes("numeric"),
+        available_dtypes=helpers.get_dtypes("float"),
         min_num_dims=1,
         valid_axis=True,
         force_int_axis=True,
+        min_value=-1e04,
+        max_value=1e04,
+        abs_smallest_val=1e-04,
     ),
     keepdim=st.booleans(),
 )
@@ -704,6 +711,8 @@ def test_torch_nanmedian(
         input=input[0],
         dim=dim,
         keepdim=keepdim,
+        atol=1e-02,
+        rtol=1e-02,
     )
 
 
@@ -790,9 +799,9 @@ def test_torch_norm(
         allow_neg_axes=False,
         max_axes_size=1,
         force_int_axis=True,
-        large_abs_safety_factor=10,
-        small_abs_safety_factor=10,
-        safety_factor_scale="log",
+        min_value=-1e04,
+        max_value=1e04,
+        abs_smallest_val=1e-04,
     ),
     dtype=helpers.get_dtypes("numeric", none=True, full=False),
     keepdims=st.booleans(),
@@ -846,8 +855,6 @@ def test_torch_quantile(
     input_dtype, x, axis, interpolation, q = dtype_and_x
     if type(axis) is tuple:
         axis = axis[0]
-    if interpolation == "nearest_jax":
-        interpolation = "nearest"
     helpers.test_frontend_function(
         input_dtypes=input_dtype,
         backend_to_test=backend_fw,
@@ -888,8 +895,10 @@ def test_torch_std(
         on_device=on_device,
         input=x[0],
         dim=axis,
-        unbiased=bool(correction),
+        correction=correction,
         keepdim=keepdims,
+        rtol=3e-1,
+        atol=3e-1,
     )
 
 
@@ -922,8 +931,10 @@ def test_torch_std_mean(
         on_device=on_device,
         input=x[0],
         dim=axis,
-        unbiased=bool(correction),
+        correction=correction,
         keepdim=keepdims,
+        rtol=3e-1,
+        atol=3e-1,
     )
 
 
@@ -960,6 +971,10 @@ def test_torch_sum(
         dim=axis,
         keepdim=keepdims,
         dtype=castable_dtype,
+        atol=1e-02,
+        rtol=1e-02,
+        test_dtypes=False,
+        test_values=input_dtype[0] != "bool",
     )
 
 

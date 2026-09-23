@@ -2,7 +2,6 @@
 from typing import Optional, Union, Sequence
 import jax.numpy as jnp
 import jax
-import jaxlib.xla_extension
 
 # local
 import ivy
@@ -43,7 +42,7 @@ def beta(
     /,
     *,
     shape: Optional[Union[ivy.NativeShape, Sequence[int]]] = None,
-    device: Optional[jaxlib.xla_extension.Device] = None,
+    device: Optional[jax.Device] = None,
     dtype: Optional[jnp.dtype] = None,
     seed: Optional[int] = None,
     out: Optional[JaxArray] = None,
@@ -63,7 +62,7 @@ def gamma(
     /,
     *,
     shape: Optional[Union[ivy.NativeShape, Sequence[int]]] = None,
-    device: Optional[jaxlib.xla_extension.Device] = None,
+    device: Optional[jax.Device] = None,
     dtype: Optional[jnp.dtype] = None,
     seed: Optional[int] = None,
     out: Optional[JaxArray] = None,
@@ -80,7 +79,7 @@ def poisson(
     lam: Union[float, JaxArray],
     *,
     shape: Optional[Union[ivy.NativeShape, Sequence[int]]] = None,
-    device: Optional[jaxlib.xla_extension.Device] = None,
+    device: Optional[jax.Device] = None,
     dtype: Optional[jnp.dtype] = None,
     seed: Optional[int] = None,
     fill_value: Optional[Union[float, int]] = 0,
@@ -100,10 +99,12 @@ def poisson(
         list_shape = None
     if jnp.any(lam < 0):
         pos_lam = jnp.where(lam < 0, 0, lam)
-        ret = jax.random.poisson(rng_input, pos_lam, shape=list_shape).astype(dtype)
+        ret = jnp.astype(
+            jax.random.poisson(rng_input, pos_lam, shape=list_shape), dtype
+        )
         ret = jnp.where(lam < 0, fill_value, ret)
     else:
-        ret = jax.random.poisson(rng_input, lam, shape=list_shape).astype(dtype)
+        ret = jnp.astype(jax.random.poisson(rng_input, lam, shape=list_shape), dtype)
     return ret
 
 
@@ -112,7 +113,7 @@ def bernoulli(
     *,
     logits: Optional[Union[float, JaxArray]] = None,
     shape: Optional[Union[ivy.NativeArray, Sequence[int]]] = None,
-    device: Optional[jaxlib.xla_extension.Device] = None,
+    device: Optional[jax.Device] = None,
     dtype: Optional[jnp.dtype] = None,
     seed: Optional[int] = None,
     out: Optional[JaxArray] = None,
@@ -127,4 +128,4 @@ def bernoulli(
         probs = jax.nn.softmax(logits, axis=-1)
     if hasattr(probs, "shape") and not _check_shapes_broadcastable(shape, probs.shape):
         shape = probs.shape
-    return jax.random.bernoulli(rng_input, probs, shape=shape).astype(dtype)
+    return jnp.astype(jax.random.bernoulli(rng_input, probs, shape=shape), dtype)

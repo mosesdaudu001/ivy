@@ -2,14 +2,14 @@ import math
 from typing import Optional, Tuple, Sequence, Union
 import jax.numpy as jnp
 import jax.scipy.linalg as jla
-
+import jax
+from collections import namedtuple
 from ivy.func_wrapper import with_supported_dtypes
 from ivy.functional.backends.jax import JaxArray
 
 import ivy
 
 from ivy.functional.ivy.experimental.linear_algebra import _check_valid_dimension_size
-from ivy.utils.exceptions import IvyNotImplementedException
 from . import backend_version
 
 
@@ -82,7 +82,7 @@ def diagflat(
         mode="constant",
     )
 
-    ret = output_array.astype(x.dtype)
+    ret = jnp.astype(output_array, x.dtype)
     if ivy.exists(out):
         ivy.inplace_update(out, ret)
 
@@ -180,8 +180,29 @@ def lu_factor(
     *,
     pivot: Optional[bool] = True,
     out: Optional[JaxArray] = None,
-) -> Tuple[JaxArray]:
-    raise IvyNotImplementedException()
+) -> Tuple[JaxArray, JaxArray]:
+    ret_tuple = namedtuple("lu_factor", ["LU", "p"])
+    lu, piv = jla.lu_factor(x)
+    m = lu.shape[-2]
+
+    def body_fun(i, p):
+        p = p.at[i].set(p[piv[i]]).at[piv[i]].set(p[i])
+        return p
+
+    p = jax.lax.fori_loop(0, m, body_fun, jnp.arange(m))
+    return ret_tuple(lu, p)
+
+
+def lu_solve(
+    lu: Tuple[JaxArray, JaxArray],
+    p: JaxArray,
+    b: JaxArray,
+    /,
+    *,
+    out: Optional[JaxArray] = None,
+) -> JaxArray:
+    p = p - 1
+    return jla.lu_solve((lu, p), b)
 
 
 def dot(

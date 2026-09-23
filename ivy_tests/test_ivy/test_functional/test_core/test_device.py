@@ -14,8 +14,6 @@ import psutil
 import subprocess
 from hypothesis import strategies as st, assume
 
-# nvidia-ml-py (pynvml) is not installed in CPU Dockerfile.
-
 # local
 import ivy
 import ivy_tests.test_ivy.helpers as helpers
@@ -26,9 +24,8 @@ try:
     import pynvml
 except ImportError:
     warnings.warn(
-        "pynvml installation was not found in the environment, functionalities"
-        " of the Ivy's device module will be limited. Please install pynvml if"
-        " you wish to use GPUs with Ivy."
+        "'pynvml' installation was not found in the environment, some functionalities"
+        " of the ivy.device module will be limited."
     )
 
 

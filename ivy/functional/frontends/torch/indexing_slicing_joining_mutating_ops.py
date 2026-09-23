@@ -102,13 +102,11 @@ def diagonal_scatter(input, src, offset=0, dim1=0, dim2=1):
 
 @to_ivy_arrays_and_back
 def dsplit(input, indices_or_sections, /):
-    if isinstance(indices_or_sections, (list, tuple, ivy.Array)):
-        indices_or_sections = (
-            ivy.diff(indices_or_sections, prepend=[0], append=[input.shape[2]])
-            .astype(ivy.int8)
-            .to_list()
+    if input.ndim < 3:
+        raise ValueError(
+            f"dsplit requires a tensor with at least 3 dimensions, but got a tensor with {input.ndim}"
         )
-    return tuple(ivy.dsplit(input, indices_or_sections))
+    return tensor_split(input, indices_or_sections, dim=2)
 
 
 @to_ivy_arrays_and_back
@@ -125,7 +123,9 @@ def gather(input, dim, index, *, sparse_grad=False, out=None):
 
     dim = dim % len(input.shape)
     all_indices = ivy.argwhere(ivy.full(index.shape, True))
-    gather_locations = ivy.reshape(index, [ivy.prod(ivy.array(index.shape))])
+    gather_locations = ivy.reshape(
+        index, [ivy.prod(ivy.array(index.shape), dtype=torch_frontend.int64)]
+    )
 
     gather_indices = []
     for axis in range(len(index.shape)):
@@ -142,20 +142,11 @@ def gather(input, dim, index, *, sparse_grad=False, out=None):
 
 @to_ivy_arrays_and_back
 def hsplit(input, indices_or_sections=None, /):
-    if isinstance(indices_or_sections, (list, tuple, ivy.Array)):
-        if input.ndim == 1:
-            indices_or_sections = (
-                ivy.diff(indices_or_sections, prepend=[0], append=[input.shape[0]])
-                .astype(ivy.int8)
-                .to_list()
-            )
-        else:
-            indices_or_sections = (
-                ivy.diff(indices_or_sections, prepend=[0], append=[input.shape[1]])
-                .astype(ivy.int8)
-                .to_list()
-            )
-    return tuple(ivy.hsplit(input, indices_or_sections))
+    if input.ndim == 1:
+        dim = 0
+    else:
+        dim = 1
+    return tensor_split(input, indices_or_sections, dim=dim)
 
 
 @to_ivy_arrays_and_back
@@ -397,6 +388,7 @@ def squeeze(input, dim=None):
     return ivy.squeeze(input, axis=dim)
 
 
+@numpy_to_torch_style_args
 @to_ivy_arrays_and_back
 def stack(tensors, dim=0, *, out=None):
     return ivy.stack(tensors, axis=dim, out=out)
@@ -438,13 +430,53 @@ def take_along_dim(input, indices, dim, *, out=None):
 @to_ivy_arrays_and_back
 def tensor_split(input, indices_or_sections, dim=0):
     if isinstance(indices_or_sections, (list, tuple, ivy.Array)):
-        indices_or_sections = (
-            ivy.diff(indices_or_sections, prepend=[0], append=[input.shape[dim]])
-            .astype(ivy.int8)
-            .to_list()
-        )
+        if isinstance(indices_or_sections, ivy.Array):
+            indices = indices_or_sections
+        else:
+            indices = ivy.array(indices_or_sections)
+
+        if indices.shape[0] <= 1:
+            is_sorted = True
+        else:
+            diffs = ivy.diff(indices)
+            is_sorted = ivy.all(diffs >= 0)
+
+        if is_sorted:
+            dim_size = input.shape[dim]            
+            split_points = ivy.concat([
+                ivy.array([0]),
+                indices,
+                ivy.array([dim_size])
+            ])
+            sizes = ivy.diff(split_points)
+            sizes = ivy.maximum(sizes, 0)
+            return ivy.split(
+                input, num_or_size_splits=sizes, axis=dim, with_remainder=True
+            )
+        else:
+            # Fallback: manual slicing for unsorted indices
+            # This is needed for cases like [6, 1, 1] where PyTorch's semantics
+            # cannot be expressed efficiently with pure tensor operations
+            indices_list = indices.to_list()
+            dim_size = input.shape[dim]
+            split_points = [0] + indices_list + [dim_size]
+
+            splits = []
+            for i in range(len(split_points) - 1):
+                start = split_points[i]
+                end = split_points[i + 1]
+
+                slices = [slice(None)] * input.ndim
+                slices[dim] = slice(start, end)
+                splits.append(input[tuple(slices)])
+
+            return tuple(splits)
+
     return ivy.split(
-        input, num_or_size_splits=indices_or_sections, axis=dim, with_remainder=True
+        input,
+        num_or_size_splits=indices_or_sections,
+        axis=dim,
+        with_remainder=True,
     )
 
 
@@ -486,13 +518,7 @@ def unsqueeze(input, dim=0):
 
 @to_ivy_arrays_and_back
 def vsplit(input, indices_or_sections=None, /):
-    if isinstance(indices_or_sections, (list, tuple, ivy.Array)):
-        indices_or_sections = (
-            ivy.diff(indices_or_sections, prepend=[0], append=[input.shape[0]])
-            .astype(ivy.int8)
-            .to_list()
-        )
-    return tuple(ivy.vsplit(input, indices_or_sections))
+    return tensor_split(input, indices_or_sections, dim=0)
 
 
 @to_ivy_arrays_and_back

@@ -75,6 +75,15 @@ class Finfo:
     def smallest_normal(self):
         return float(self._tf_finfo.tiny)
 
+    def __getattribute__(self, name):
+        try:
+            # Try to get the attribute from the Finfo class
+            return super().__getattribute__(name)
+        except AttributeError:
+            # If the attribute doesn't exist in Finfo, try to get it from _tf_finfo
+            tf_finfo = super().__getattribute__("_tf_finfo")
+            return getattr(tf_finfo, name)
+
 
 class Bfloat16Finfo:
     def __init__(self):
@@ -115,14 +124,16 @@ def broadcast_arrays(
 ) -> List[Union[tf.Tensor, tf.Variable]]:
     if len(arrays) > 1:
         try:
-            desired_shape = tf.broadcast_dynamic_shape(arrays[0].shape, arrays[1].shape)
+            desired_shape = tf.broadcast_dynamic_shape(
+                tf.shape(arrays[0]), tf.shape(arrays[1])
+            )
         except tf.errors.InvalidArgumentError as e:
             raise ivy.utils.exceptions.IvyBroadcastShapeError(e) from e
         if len(arrays) > 2:
             for i in range(2, len(arrays)):
                 try:
                     desired_shape = tf.broadcast_dynamic_shape(
-                        desired_shape, arrays[i].shape
+                        desired_shape, tf.shape(arrays[i])
                     )
                 except tf.errors.InvalidArgumentError as e:
                     raise ivy.utils.exceptions.IvyBroadcastShapeError(e) from e

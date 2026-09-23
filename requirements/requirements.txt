@@ -1,18 +1,12 @@
-numpy # unpinned we test with latest version now
-einops
-psutil
-termcolor
-colorama
-packaging
-nvidia-ml-py # mod_name=pynvml
-diskcache
-google-auth # mod_name=google.auth
-urllib3<2.0 # for version conflict with google-auth
-requests
-pyvis
+astor
+cryptography>=40.0.0
 dill
-astunparse
-ml-dtypes==0.2.0 # mod_name=ml_dtypes
-cloudpickle
+einops
 gast
+networkx
+numpy
+packaging
+psutil
+requests
+ruff
 tqdm

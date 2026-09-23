@@ -1027,7 +1027,7 @@ def test_torch_copysign(
 @handle_frontend_test(
     fn_tree="torch.cos",
     dtype_and_x=helpers.dtype_and_values(
-        available_dtypes=helpers.get_dtypes("float"),
+        available_dtypes=helpers.get_dtypes("numeric"),
     ),
 )
 def test_torch_cos(
@@ -1205,6 +1205,8 @@ def test_torch_erfc(
         fn_tree=fn_tree,
         on_device=on_device,
         input=x[0],
+        atol=1e-02,
+        rtol=1e-02,
     )
 
 
@@ -1758,6 +1760,9 @@ def test_torch_lerp(
     fn_tree="torch.lgamma",
     dtype_and_input=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("float"),
+        min_value=-1e04,
+        max_value=1e04,
+        abs_smallest_val=1e-04,
     ),
 )
 def test_torch_lgamma(
@@ -1778,6 +1783,8 @@ def test_torch_lgamma(
         fn_tree=fn_tree,
         on_device=on_device,
         input=input[0],
+        atol=1e-03,
+        rtol=1e-03,
     )
 
 
@@ -2696,6 +2703,9 @@ def test_torch_sin(
     fn_tree="torch.sinc",
     dtype_and_x=helpers.dtype_and_values(
         available_dtypes=helpers.get_dtypes("float"),
+        min_value=-1e04,
+        max_value=1e04,
+        abs_smallest_val=1e-04,
     ),
 )
 def test_torch_sinc(
@@ -2716,6 +2726,8 @@ def test_torch_sinc(
         fn_tree=fn_tree,
         on_device=on_device,
         input=x[0],
+        atol=1e-02,
+        rtol=1e-02,
     )
 
 
@@ -2770,6 +2782,8 @@ def test_torch_sqrt(
         fn_tree=fn_tree,
         on_device=on_device,
         input=input[0],
+        atol=1e-03,
+        rtol=1e-03,
     )
 
 

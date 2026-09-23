@@ -185,6 +185,11 @@ torch_promotion_table = {
 }
 
 
+class device:
+    def __new__(cls, dev):
+        return ivy.default_device(dev)
+
+
 @handle_exceptions
 def promote_types_torch(
     type1: Union[ivy.Dtype, ivy.NativeDtype],
@@ -232,13 +237,13 @@ def promote_types_of_torch_inputs(
     used as inputs only for those functions that expect an array-like or
     tensor-like objects, otherwise it might give unexpected results.
     """
-    if ivy.isscalar(x1) and ivy.is_int_dtype(x1):
+    if (ivy.isscalar(x1) or isinstance(x1, (list, tuple))) and ivy.is_int_dtype(x1):
         x1 = ivy.asarray(x1, dtype="int64")
-    elif ivy.isscalar(x1):
+    elif ivy.isscalar(x1) or isinstance(x1, (list, tuple)):
         x1 = ivy.asarray(x1)
-    if ivy.isscalar(x2) and ivy.is_int_dtype(x2):
+    if (ivy.isscalar(x2) or isinstance(x2, (list, tuple))) and ivy.is_int_dtype(x2):
         x2 = ivy.asarray(x2, dtype="int64")
-    elif ivy.isscalar(x2):
+    elif ivy.isscalar(x2) or isinstance(x2, (list, tuple)):
         x2 = ivy.asarray(x2)
     type1 = ivy.default_dtype(item=x1).strip("u123456789")
     type2 = ivy.default_dtype(item=x2).strip("u123456789")
@@ -260,9 +265,27 @@ def promote_types_of_torch_inputs(
 
 
 from . import nn
-from .nn.functional import softmax, relu, lstm
+from .nn.functional import (
+    softmax,
+    relu,
+    lstm,
+    conv1d,
+    conv2d,
+    conv3d,
+    conv_transpose1d,
+    conv_transpose2d,
+    conv_transpose3d,
+)
+from . import utils
+from .utils import *
 from . import special
 from . import tensor
+from . import _VF
+from . import onnx
+from . import jit
+from . import overrides
+from . import _C
+from . import hub
 from .tensor import *
 from . import blas_and_lapack_ops
 from .blas_and_lapack_ops import *
@@ -291,9 +314,19 @@ from .tensor_functions import *
 from . import utilities
 from .utilities import *
 from . import linalg
+from .linalg import lu
 from . import func
 from .func import *
+from . import casting_ops
+from .casting_ops import *
+from . import serialization
+from .serialization import *
 
+# make private fns accessible
+from .reduction_ops import (
+    _is_all_true,
+    _is_any_true,
+)
 
 _frontend_array = tensor
 

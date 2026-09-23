@@ -17,6 +17,7 @@
   :caption: The Basics
 
   overview/get_started.rst
+  overview/api_key.rst
   demos/quickstart.ipynb
 
 
@@ -26,7 +27,6 @@
   :caption: Demos
 
   demos/learn_the_basics.rst
-  demos/guides.rst
   demos/examples_and_demos.rst
 
 
@@ -46,7 +46,6 @@
 
   overview/design.rst
   overview/contributing.rst
-  overview/volunteer_ranks.rst
   overview/deep_dive.rst
   overview/glossary.rst
   overview/faq.rst

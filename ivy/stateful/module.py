@@ -4,6 +4,7 @@
 from collections import OrderedDict
 import os
 import copy
+from packaging import version
 import dill
 from typing import Optional, Tuple, Dict
 
@@ -679,8 +680,7 @@ class _HaikuIvyModule(Module):
         return self._hk_params
 
     def _build(self, params_hk, *args, **kwargs):
-        pass
-
+        ivy.set_jax_backend()
         args, kwargs = ivy.args_to_native(*args, **kwargs)
         # noinspection PyUnresolvedReferences
         params_dict = self._hk_flat_map_to_dict(params_hk)
@@ -688,9 +688,15 @@ class _HaikuIvyModule(Module):
         param_iterator = self._hk_params.cont_to_iterator()
         _, param0 = next(param_iterator, ["_", 0])
         if hasattr(param0, "device"):
-            self._device = ivy.as_ivy_dev(param0.device())
+            import jax
+
+            if version.parse(jax.__version__) >= version.parse("0.4.31"):
+                self._device = ivy.as_ivy_dev(param0.device)
+            else:
+                self._device = ivy.as_ivy_dev(param0.device())
         else:
             self._device = ivy.as_ivy_dev("cpu")
+        ivy.previous_backend()
 
     def _forward(self, *a, **kw):
         a, kw = ivy.args_to_native(*a, **kw)
@@ -775,9 +781,27 @@ class _KerasIvyModule(Module):
         return self._native_params
 
     def _build(self, *args, **kwargs):
+        import tensorflow as tf
+
+        def _get_variable_name(variable):
+            return variable.path.split("/")[-2] + "/" + variable.name + ":0"
+
         self._native_params = ivy.Container(
             OrderedDict(
-                sorted([(param.name, param) for param in self._native_module.variables])
+                sorted(
+                    [
+                        (
+                            (
+                                param.name
+                                if tf.__version__ < "2.16.0"
+                                else _get_variable_name(param)
+                            ),
+                            param,
+                        )
+                        for param in self._native_module.variables
+                    ],
+                    key=lambda kv: kv[0],
+                )
             ),
             dynamic_backend=False,
         )

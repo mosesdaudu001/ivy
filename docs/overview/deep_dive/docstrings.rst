@@ -3,8 +3,8 @@ Docstrings
 
 .. _`Array API Standard`: https://data-apis.org/array-api/latest/
 .. _`spec/API_specification/array_api`: https://github.com/data-apis/array-api/blob/main
-.. _`repo`: https://github.com/unifyai/ivy
-.. _`discord`: https://discord.gg/sXyFF8tDtm
+.. _`repo`: https://github.com/ivy-llc/ivy
+.. _`discord`: https://discord.gg/uYRmyPxMQq
 .. _`docstrings thread`: https://discord.com/channels/799879767196958751/1189906836426596412
 
 
@@ -196,10 +196,10 @@ These examples should hopefully give you a good understanding of what is require
 If you have any questions, please feel free to reach out on `discord`_ in the `docstrings thread`_!
 
 
-**Video**
+.. **Video**
 
-.. raw:: html
+.. .. raw:: html
 
-    <iframe width="420" height="315" allow="fullscreen;"
-    src="https://www.youtube.com/embed/TnshJ8swuJM" class="video">
-    </iframe>
+..     <iframe width="420" height="315" allow="fullscreen;"
+..     src="https://www.youtube.com/embed/TnshJ8swuJM" class="video">
+..     </iframe>

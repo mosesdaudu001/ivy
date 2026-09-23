@@ -396,8 +396,8 @@ def conv_general_dilated(
             ]
     df = _get_x_data_format(dims, data_format)
     promoted_type = jnp.promote_types(x.dtype, filters.dtype)
-    x = x.astype(promoted_type)
-    filters = filters.astype(promoted_type)
+    x = jnp.astype(x, promoted_type)
+    filters = jnp.astype(filters, promoted_type)
     res = jlax.conv_general_dilated(
         x,
         filters,
@@ -501,7 +501,8 @@ def nms(
         keep = jnp.zeros((size,), dtype=jnp.int64)
         keep_idx = 0
 
-        while jnp.unique(order).size > 1:
+        def body_fn(loop_vars):
+            keep, keep_idx, boxes, areas, order = loop_vars
             max_iou_idx = order[0]
             keep = keep.at[keep_idx].set(max_iou_idx)
             keep_idx += 1
@@ -521,6 +522,15 @@ def nms(
             order = order.at[forward].set(order[forward[::-1]])
             boxes = boxes.at[forward].set(boxes[forward[::-1]])
             areas = areas.at[forward].set(areas[forward[::-1]])
+
+            return keep, keep_idx, boxes, areas, order
+
+        def cond_fn(loop_vars):
+            _, _, _, _, order = loop_vars
+            return jnp.min(order) != jnp.max(order)
+
+        init_vars = (keep, keep_idx, boxes, areas, order)
+        keep, keep_idx, boxes, _, _ = jlax.while_loop(cond_fn, body_fn, init_vars)
 
         ret = jnp.array(keep[:keep_idx], dtype=jnp.int64)
 
